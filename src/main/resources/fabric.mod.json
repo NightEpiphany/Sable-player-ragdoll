@@ -1,0 +1,34 @@
+{
+	"schemaVersion": 1,
+	"id": "sable_player_ragdoll",
+	"version": "${version}",
+	"name": "PlayerRagdoll",
+	"description": "Ragdoll physics API for Sable. Provides the core ragdoll system and API for addon mods.",
+	"authors": [
+		"Leonardoinc22", "NightEpiphany"
+	],
+	"contact": {
+		"homepage": "https://fabricmc.net/",
+		"sources": "https://github.com/NightEpiphany/Sable-player-ragdoll"
+	},
+	"license": "Apache-2.0",
+	"icon": "sable_player_ragdoll.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.moigferdsrte.ragdoll.fabric.SablePlayerRagdollFabric"
+		],
+		"client": [
+			"com.moigferdsrte.ragdoll.fabric.SablePlayerRagdollFabricClient"
+		]
+	},
+	"mixins": [
+		"sable_player_ragdoll.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"minecraft": "~1.21.1",
+		"java": ">=21",
+		"fabric-api": "*"
+	}
+}
