@@ -9,7 +9,6 @@ import com.moigferdsrte.ragdoll.mob.model.ExtractedMobModel.Pose;
 import com.moigferdsrte.ragdoll.mob.model.ExtractedMobModel.TexturedQuad;
 import com.moigferdsrte.ragdoll.mob.model.ExtractedMobModel.Vertex;
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
@@ -18,22 +17,16 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import net.minecraft.client.model.AgeableListModel;
 import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.model.geom.PartPose;
 import org.joml.Matrix4f;
+import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
 public final class RenderedModelExtractor {
     private static final Field MODEL_PART_CUBES = field(ModelPart.class, "cubes");
     private static final Field MODEL_PART_CHILDREN = field(ModelPart.class, "children");
-    private static final Field AGEABLE_SCALE_HEAD = field(AgeableListModel.class, "scaleHead");
-    private static final Field AGEABLE_BABY_Y_HEAD_OFFSET = field(AgeableListModel.class, "babyYHeadOffset");
-    private static final Field AGEABLE_BABY_Z_HEAD_OFFSET = field(AgeableListModel.class, "babyZHeadOffset");
-    private static final Field AGEABLE_BABY_HEAD_SCALE = field(AgeableListModel.class, "babyHeadScale");
-    private static final Field AGEABLE_BABY_BODY_SCALE = field(AgeableListModel.class, "babyBodyScale");
-    private static final Field AGEABLE_BODY_Y_OFFSET = field(AgeableListModel.class, "bodyYOffset");
 
     private RenderedModelExtractor() {
     }
@@ -55,16 +48,15 @@ public final class RenderedModelExtractor {
             collectChildNames(part, knownNames);
         }
 
-        AgeableTransforms ageableTransforms = AgeableTransforms.forModel(model);
         for (RootPart root : rootParts(model)) {
             knownNames.putIfAbsent(root.part(), root.name());
-            PoseStack poseStack = ageableTransforms.basePose(root.part());
+            PoseStack poseStack = new PoseStack();
             collectPart(knownNames.getOrDefault(root.part(), root.name()), null, root.part(), knownNames, parts, visited, poseStack, animated);
         }
         for (RootPart root : declaredFieldParts(model)) {
             if (!visited.contains(root.part())) {
                 knownNames.putIfAbsent(root.part(), root.name());
-                PoseStack poseStack = ageableTransforms.basePose(root.part());
+                PoseStack poseStack = new PoseStack();
                 collectPart(knownNames.getOrDefault(root.part(), root.name()), null, root.part(), knownNames, parts, visited, poseStack, animated);
             }
         }
@@ -156,16 +148,16 @@ public final class RenderedModelExtractor {
             zRot = part.zRot;
         } else {
             PartPose pose = part.getInitialPose();
-            x = pose.x;
-            y = pose.y;
-            z = pose.z;
-            xRot = pose.xRot;
-            yRot = pose.yRot;
-            zRot = pose.zRot;
+            x = pose.x();
+            y = pose.y();
+            z = pose.z();
+            xRot = pose.xRot();
+            yRot = pose.yRot();
+            zRot = pose.zRot();
         }
         poseStack.translate(x / 16.0F, y / 16.0F, z / 16.0F);
         if (xRot != 0.0F || yRot != 0.0F || zRot != 0.0F) {
-            poseStack.mulPose(new org.joml.Quaternionf().rotationZYX(zRot, yRot, xRot));
+            poseStack.mulPose(new Matrix4f().rotation(new Quaternionf().rotationZYX(zRot, yRot, xRot)));
         }
         if (part.xScale != 1.0F || part.yScale != 1.0F || part.zScale != 1.0F) {
             poseStack.scale(part.xScale, part.yScale, part.zScale);
@@ -345,102 +337,6 @@ public final class RenderedModelExtractor {
     private record RootPart(ModelPart part, String name) {
     }
 
-    private enum AgeableGroup {
-        HEAD,
-        BODY,
-        NONE
-    }
-
-    private record AgeableTransforms(
-            Map<ModelPart, AgeableGroup> rootGroups,
-            boolean scaleHead,
-            float babyYHeadOffset,
-            float babyZHeadOffset,
-            float babyHeadScale,
-            float babyBodyScale,
-            float bodyYOffset
-    ) {
-        private static AgeableTransforms none() {
-            return new AgeableTransforms(Map.of(), false, 0.0F, 0.0F, 1.0F, 1.0F, 0.0F);
-        }
-
-        private static AgeableTransforms forModel(EntityModel<?> model) {
-            if (!(model instanceof AgeableListModel<?> ageableModel) || !model.young) {
-                return none();
-            }
-
-            try {
-                Map<ModelPart, AgeableGroup> groups = new IdentityHashMap<>();
-                for (ModelPart part : invokeModelParts(ageableModel, "headParts")) {
-                    groups.put(part, AgeableGroup.HEAD);
-                }
-                for (ModelPart part : invokeModelParts(ageableModel, "bodyParts")) {
-                    groups.put(part, AgeableGroup.BODY);
-                }
-                if (groups.isEmpty()) {
-                    return none();
-                }
-                return new AgeableTransforms(
-                        groups,
-                        AGEABLE_SCALE_HEAD.getBoolean(ageableModel),
-                        AGEABLE_BABY_Y_HEAD_OFFSET.getFloat(ageableModel),
-                        AGEABLE_BABY_Z_HEAD_OFFSET.getFloat(ageableModel),
-                        AGEABLE_BABY_HEAD_SCALE.getFloat(ageableModel),
-                        AGEABLE_BABY_BODY_SCALE.getFloat(ageableModel),
-                        AGEABLE_BODY_Y_OFFSET.getFloat(ageableModel)
-                );
-            } catch (ReflectiveOperationException ignored) {
-                return none();
-            }
-        }
-
-        private PoseStack basePose(ModelPart root) {
-            PoseStack poseStack = new PoseStack();
-            AgeableGroup group = this.rootGroups.getOrDefault(root, AgeableGroup.NONE);
-            if (group == AgeableGroup.HEAD) {
-                if (this.scaleHead) {
-                    float scale = 1.5F / this.babyHeadScale;
-                    poseStack.scale(scale, scale, scale);
-                }
-                poseStack.translate(0.0F, this.babyYHeadOffset / 16.0F, this.babyZHeadOffset / 16.0F);
-            } else if (group == AgeableGroup.BODY) {
-                float scale = 1.0F / this.babyBodyScale;
-                poseStack.scale(scale, scale, scale);
-                poseStack.translate(0.0F, this.bodyYOffset / 16.0F, 0.0F);
-            }
-            return poseStack;
-        }
-
-        private static Iterable<ModelPart> invokeModelParts(AgeableListModel<?> model, String methodName)
-                throws ReflectiveOperationException {
-            Method method = method(model.getClass(), methodName);
-            Object result = method.invoke(model);
-            if (!(result instanceof Iterable<?> iterable)) {
-                return List.of();
-            }
-            Set<ModelPart> parts = Collections.newSetFromMap(new IdentityHashMap<>());
-            List<ModelPart> ordered = new ArrayList<>();
-            for (Object value : iterable) {
-                if (value instanceof ModelPart part && parts.add(part)) {
-                    ordered.add(part);
-                }
-            }
-            return List.copyOf(ordered);
-        }
-    }
-
-    private static Method method(Class<?> type, String name, Class<?>... parameterTypes) {
-        for (Class<?> current = type; current != null && current != Object.class; current = current.getSuperclass()) {
-            try {
-                Method method = current.getDeclaredMethod(name, parameterTypes);
-                method.setAccessible(true);
-                return method;
-            } catch (NoSuchMethodException ignored) {
-            }
-        }
-        throw new IllegalStateException("Missing method " + type.getName() + "." + name);
-    }
-
     private static final class CapturingVertexConsumer implements VertexConsumer {
         private final List<Vertex> vertices = new ArrayList<>(4);
         private final List<TexturedQuad> quads = new ArrayList<>();
@@ -494,6 +390,11 @@ public final class RenderedModelExtractor {
         }
 
         @Override
+        public VertexConsumer setColor(int color) {
+            return this;
+        }
+
+        @Override
         public VertexConsumer setUv(float u, float v) {
             this.u = u;
             this.v = v;
@@ -511,10 +412,20 @@ public final class RenderedModelExtractor {
         }
 
         @Override
+        public VertexConsumer setUv3(float u, float v) {
+            return this;
+        }
+
+        @Override
         public VertexConsumer setNormal(float x, float y, float z) {
             this.normalX = x;
             this.normalY = y;
             this.normalZ = z;
+            return this;
+        }
+
+        @Override
+        public VertexConsumer setLineWidth(float width) {
             return this;
         }
 

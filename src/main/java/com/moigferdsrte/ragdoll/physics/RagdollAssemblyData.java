@@ -9,7 +9,6 @@ import java.util.Map;
 import java.util.UUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
 import org.jetbrains.annotations.Nullable;
 
@@ -70,29 +69,36 @@ public final class RagdollAssemblyData {
    private static RagdollLimbOptions decodeLimbs(CompoundTag record) {
       if (!record.contains("Limbs")) return RagdollLimbOptions.defaults();
       RagdollLimbOptions.Builder builder = RagdollLimbOptions.builder();
-      for (Tag entry : record.getList("Limbs", Tag.TAG_COMPOUND)) {
-         CompoundTag limbTag = (CompoundTag) entry;
+      ListTag limbs = record.getListOrEmpty("Limbs");
+      for (int index = 0; index < limbs.size(); index++) {
+         CompoundTag limbTag = limbs.getCompoundOrEmpty(index);
          RagdollLimbConfig.Builder config = RagdollLimbConfig.builder();
-         if (limbTag.contains("Pitch")) config.pitch(limbTag.getDouble("Pitch"));
-         if (limbTag.contains("Yaw")) config.yaw(limbTag.getDouble("Yaw"));
-         if (limbTag.contains("Roll")) config.roll(limbTag.getDouble("Roll"));
-         if (limbTag.contains("InitialPitch") || limbTag.contains("InitialYaw") || limbTag.contains("InitialRoll")) {
+         limbTag.getDouble("Pitch").ifPresent(config::pitch);
+         limbTag.getDouble("Yaw").ifPresent(config::yaw);
+         limbTag.getDouble("Roll").ifPresent(config::roll);
+         var initialPitch = limbTag.getDouble("InitialPitch");
+         var initialYaw = limbTag.getDouble("InitialYaw");
+         var initialRoll = limbTag.getDouble("InitialRoll");
+         if (initialPitch.isPresent() || initialYaw.isPresent() || initialRoll.isPresent()) {
             config.initialRotation(
-               limbTag.contains("InitialPitch") ? limbTag.getDouble("InitialPitch") : 0.0,
-               limbTag.contains("InitialYaw") ? limbTag.getDouble("InitialYaw") : 0.0,
-               limbTag.contains("InitialRoll") ? limbTag.getDouble("InitialRoll") : 0.0
+               initialPitch.orElse(0.0),
+               initialYaw.orElse(0.0),
+               initialRoll.orElse(0.0)
             );
          }
-         if (limbTag.contains("Right") || limbTag.contains("Up") || limbTag.contains("Forward")) {
+         var right = limbTag.getDouble("Right");
+         var up = limbTag.getDouble("Up");
+         var forward = limbTag.getDouble("Forward");
+         if (right.isPresent() || up.isPresent() || forward.isPresent()) {
             config.offset(
-               limbTag.contains("Right") ? limbTag.getDouble("Right") : 0.0,
-               limbTag.contains("Up") ? limbTag.getDouble("Up") : 0.0,
-               limbTag.contains("Forward") ? limbTag.getDouble("Forward") : 0.0
+               right.orElse(0.0),
+               up.orElse(0.0),
+               forward.orElse(0.0)
             );
          }
-         if (limbTag.contains("Stiffness")) config.stiffness(limbTag.getDouble("Stiffness"));
-         if (limbTag.contains("Damping")) config.damping(limbTag.getDouble("Damping"));
-         builder.limb(BodyPart.byName(limbTag.getString("BodyPart")), config);
+         limbTag.getDouble("Stiffness").ifPresent(config::stiffness);
+         limbTag.getDouble("Damping").ifPresent(config::damping);
+         builder.limb(BodyPart.byName(limbTag.getStringOr("BodyPart", "")), config);
       }
       return builder.build();
    }

@@ -5,11 +5,11 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 public record RagdollRequestPosePacket(long requestId) implements CustomPacketPayload {
    public static final Type<RagdollRequestPosePacket> TYPE = new Type<>(
-      ResourceLocation.fromNamespaceAndPath("sable_player_ragdoll", "request_pose")
+      Identifier.fromNamespaceAndPath("sable_player_ragdoll", "request_pose")
    );
    public static final StreamCodec<RegistryFriendlyByteBuf, RagdollRequestPosePacket> STREAM_CODEC = StreamCodec.of(
       (buffer, packet) -> buffer.writeLong(packet.requestId()),

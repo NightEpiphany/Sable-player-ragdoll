@@ -27,17 +27,17 @@ public final class FabricNetwork {
     public static void registerTypes() {
         if (registered) return;
         registered = true;
-        PayloadTypeRegistry.playC2S().register(RagdollTriggerPacket.TYPE, RagdollTriggerPacket.STREAM_CODEC);
-        PayloadTypeRegistry.playC2S().register(RagdollGrabPacket.TYPE, RagdollGrabPacket.STREAM_CODEC);
-        PayloadTypeRegistry.playC2S().register(RagdollInputPacket.TYPE, RagdollInputPacket.STREAM_CODEC);
-        PayloadTypeRegistry.playC2S().register(RagdollArmInputPacket.TYPE, RagdollArmInputPacket.STREAM_CODEC);
-        PayloadTypeRegistry.playC2S().register(RagdollPoseResponsePacket.TYPE, RagdollPoseResponsePacket.STREAM_CODEC);
-        PayloadTypeRegistry.playC2S().register(MobRagdollSpawnPacket.TYPE, MobRagdollSpawnPacket.STREAM_CODEC);
-        PayloadTypeRegistry.playC2S().register(MobRagdollDespawnPacket.TYPE, MobRagdollDespawnPacket.STREAM_CODEC);
-        PayloadTypeRegistry.playS2C().register(RagdollGrabSyncPacket.TYPE, RagdollGrabSyncPacket.STREAM_CODEC);
-        PayloadTypeRegistry.playS2C().register(RagdollRequestPosePacket.TYPE, RagdollRequestPosePacket.STREAM_CODEC);
-        PayloadTypeRegistry.playS2C().register(MobRagdollLaunchRequestPacket.TYPE, MobRagdollLaunchRequestPacket.STREAM_CODEC);
-        PayloadTypeRegistry.playS2C().register(MobRagdollSourceStatePacket.TYPE, MobRagdollSourceStatePacket.STREAM_CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(RagdollTriggerPacket.TYPE, RagdollTriggerPacket.STREAM_CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(RagdollGrabPacket.TYPE, RagdollGrabPacket.STREAM_CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(RagdollInputPacket.TYPE, RagdollInputPacket.STREAM_CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(RagdollArmInputPacket.TYPE, RagdollArmInputPacket.STREAM_CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(RagdollPoseResponsePacket.TYPE, RagdollPoseResponsePacket.STREAM_CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(MobRagdollSpawnPacket.TYPE, MobRagdollSpawnPacket.STREAM_CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(MobRagdollDespawnPacket.TYPE, MobRagdollDespawnPacket.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(RagdollGrabSyncPacket.TYPE, RagdollGrabSyncPacket.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(RagdollRequestPosePacket.TYPE, RagdollRequestPosePacket.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(MobRagdollLaunchRequestPacket.TYPE, MobRagdollLaunchRequestPacket.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(MobRagdollSourceStatePacket.TYPE, MobRagdollSourceStatePacket.STREAM_CODEC);
     }
 
     private static <T extends CustomPacketPayload> void registerServer(CustomPacketPayload.Type<T> type,

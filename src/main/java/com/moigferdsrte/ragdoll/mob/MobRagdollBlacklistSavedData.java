@@ -1,36 +1,50 @@
 package com.moigferdsrte.ragdoll.mob;
 
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.Collection;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.StringTag;
-import net.minecraft.nbt.Tag;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.level.saveddata.SavedDataType;
 
 public final class MobRagdollBlacklistSavedData extends SavedData {
    private static final String DATA_NAME = "sable_player_ragdoll_mob_ragdoll_blacklist";
-   private static final SavedData.Factory<MobRagdollBlacklistSavedData> FACTORY = new SavedData.Factory<>(
-      MobRagdollBlacklistSavedData::new, MobRagdollBlacklistSavedData::load, null
+   private static final Codec<MobRagdollBlacklistSavedData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+      Codec.STRING.listOf().optionalFieldOf("Entities", List.of())
+         .forGetter(data -> data.entities.stream().sorted().toList()),
+      Codec.STRING.listOf().optionalFieldOf("Namespaces", List.of())
+         .forGetter(data -> data.namespaces.stream().sorted().toList())
+   ).apply(instance, MobRagdollBlacklistSavedData::new));
+   private static final SavedDataType<MobRagdollBlacklistSavedData> TYPE = new SavedDataType<>(
+      Identifier.withDefaultNamespace(DATA_NAME), MobRagdollBlacklistSavedData::new, CODEC, DataFixTypes.SAVED_DATA_COMMAND_STORAGE
    );
 
    private final Set<String> entities = new LinkedHashSet<>();
    private final Set<String> namespaces = new LinkedHashSet<>();
 
-   public static MobRagdollBlacklistSavedData get(ServerLevel level) {
-      return level.getDataStorage().computeIfAbsent(FACTORY, DATA_NAME);
+   public MobRagdollBlacklistSavedData() {
    }
 
-   public boolean isBlacklisted(ResourceLocation entityId) {
+   private MobRagdollBlacklistSavedData(Collection<String> entities, Collection<String> namespaces) {
+      addLoadedStrings(entities, this.entities);
+      addLoadedStrings(namespaces, this.namespaces);
+   }
+
+   public static MobRagdollBlacklistSavedData get(ServerLevel level) {
+      return level.getDataStorage().computeIfAbsent(TYPE);
+   }
+
+   public boolean isBlacklisted(Identifier entityId) {
       return entityId != null && (this.entities.contains(entityId.toString()) || this.namespaces.contains(entityId.getNamespace()));
    }
 
-   public boolean addEntity(ResourceLocation entityId) {
+   public boolean addEntity(Identifier entityId) {
       if (entityId == null) {
          return false;
       }
@@ -41,7 +55,7 @@ public final class MobRagdollBlacklistSavedData extends SavedData {
       return changed;
    }
 
-   public boolean removeEntity(ResourceLocation entityId) {
+   public boolean removeEntity(Identifier entityId) {
       if (entityId == null) {
          return false;
       }
@@ -94,13 +108,6 @@ public final class MobRagdollBlacklistSavedData extends SavedData {
       return Set.copyOf(this.namespaces);
    }
 
-   @Override
-   public CompoundTag save(CompoundTag tag, HolderLookup.Provider registries) {
-      tag.put("Entities", stringList(this.entities));
-      tag.put("Namespaces", stringList(this.namespaces));
-      return tag;
-   }
-
    public static boolean isValidNamespace(String namespace) {
       if (namespace == null || namespace.isBlank()) {
          return false;
@@ -119,23 +126,9 @@ public final class MobRagdollBlacklistSavedData extends SavedData {
       return namespace == null ? "" : namespace.trim().toLowerCase(Locale.ROOT);
    }
 
-   private static MobRagdollBlacklistSavedData load(CompoundTag tag, HolderLookup.Provider registries) {
-      MobRagdollBlacklistSavedData data = new MobRagdollBlacklistSavedData();
-      readStrings(tag, "Entities", data.entities);
-      readStrings(tag, "Namespaces", data.namespaces);
-      return data;
-   }
-
-   private static ListTag stringList(Collection<String> values) {
-      ListTag list = new ListTag();
-      values.stream().sorted().forEach(value -> list.add(StringTag.valueOf(value)));
-      return list;
-   }
-
-   private static void readStrings(CompoundTag tag, String key, Set<String> target) {
-      ListTag list = tag.getList(key, Tag.TAG_STRING);
-      for (int i = 0; i < list.size(); i++) {
-         String value = list.getString(i).trim();
+   private static void addLoadedStrings(Collection<String> values, Set<String> target) {
+      for (String serializedValue : values) {
+         String value = serializedValue.trim();
          if (!value.isEmpty()) {
             target.add(value);
          }

@@ -9,8 +9,8 @@ pluginManagement {
 	}
 
 	plugins {
-		id("net.fabricmc.fabric-loom-remap") version providers.gradleProperty("loom_version")
+		id("net.fabricmc.fabric-loom") version providers.gradleProperty("loom_version")
 	}
 }
 
-rootProject.name = "PR-1.21.1-fabric"
+rootProject.name = "PR-26.3-fabric"

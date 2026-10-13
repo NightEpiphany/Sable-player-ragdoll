@@ -9,13 +9,13 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import com.moigferdsrte.ragdoll.fabric.network.FabricPayloadContext;
 
 public record RagdollTriggerPacket(RagdollLimbOptions pose, float bodyYaw) implements CustomPacketPayload {
    public static final Type<RagdollTriggerPacket> TYPE = new Type<>(
-      ResourceLocation.fromNamespaceAndPath("sable_player_ragdoll", "trigger_ragdoll")
+      Identifier.fromNamespaceAndPath("sable_player_ragdoll", "trigger_ragdoll")
    );
    public static final StreamCodec<RegistryFriendlyByteBuf, RagdollTriggerPacket> STREAM_CODEC = StreamCodec.of(
       RagdollTriggerPacket::write,

@@ -1,38 +1,17 @@
 import java.net.URI
 
 plugins {
-	id("net.fabricmc.fabric-loom-remap")
+	id("net.fabricmc.fabric-loom")
 	`maven-publish`
 }
 
 repositories {
-	exclusiveContent { // Sable
-        forRepository {
-            maven {
-                url = URI("https://maven.ryanhcode.dev/releases")
-                name = "RyanHCode Maven"
-            }
-        }
-        filter {
-            includeGroup("dev.ryanhcode.sable")
-            includeGroup("dev.ryanhcode.sable-companion")
-        }
+	flatDir {
+        dirs("libs")
     }
 	maven {
-		name = "Fuzs Mod Resources"
-		url = URI("https://raw.githubusercontent.com/Fuzss/modresources/main/maven/")
-	}
-    maven {
 		name = "Modrinth"
 		url = URI("https://api.modrinth.com/maven")
-	}
-	maven {
-        name = "WispForest"
-        url = URI("https://maven.wispforest.io/releases")
-    }
-	maven {
-		name = "BlameJared"
-		url = URI("https://maven.blamejared.com")
 	}
     mavenCentral()
 }
@@ -44,52 +23,17 @@ base {
 dependencies {
 	// To change the versions see the gradle.properties file
 	minecraft("com.mojang:minecraft:${providers.gradleProperty("minecraft_version").get()}")
-    mappings(loom.officialMojangMappings())
-	modImplementation("net.fabricmc:fabric-loader:${providers.gradleProperty("loader_version").get()}")
-	modApi("dev.ryanhcode.sable:sable-fabric-${providers.gradleProperty("minecraft_version").get()}:${providers.gradleProperty("sable_version").get()}") {
-		exclude(group = "fuzs.forgeconfigapiport:forgeconfigapiport")
-	}
-	// Fabric callbacks, registries and play networking are required by this port.
-	modImplementation("net.fabricmc.fabric-api:fabric-api:${providers.gradleProperty("fabric_api_version").get()}")
-    modCompileOnly("io.wispforest:accessories-fabric:${providers.gradleProperty("accessories_version").get()}")
-    modCompileOnly("maven.modrinth:jade:${providers.gradleProperty("jade_version").get()}")
-    testImplementation(platform("org.junit:junit-bom:5.11.4"))
-    testImplementation("org.junit.jupiter:junit-jupiter")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-}
-
-tasks.test { useJUnitPlatform() }
-
-loom {
-    mods {
-        register("sable_player_ragdoll") { sourceSet(sourceSets.main.get()) }
-    }
-}
-
-fabricApi {
-    configureTests {
-        createSourceSet = true
-        modId = "sable_player_ragdoll_test"
-        enableClientGameTests = false
-    }
-}
-
-loom {
-    runs {
-        create("smokeClient") {
-            client()
-            source(sourceSets["gametest"])
-            runDir("build/run/smokeClient")
-            vmArg("-Dragdoll.smoke=true")
-            programArgs("--width", "960", "--height", "540")
-        }
-    }
-}
-
-tasks.named("runSmokeClient") {
-    val marker = layout.buildDirectory.file("run/smokeClient/smoke-success.txt")
-    doFirst { marker.get().asFile.delete() }
-    doLast { check(marker.get().asFile.isFile) { "Client smoke test failed; inspect build/run/smokeClient/logs/latest.log" } }
+	implementation("net.fabricmc:fabric-loader:${providers.gradleProperty("loader_version").get()}")
+	// Sodium
+	implementation("maven.modrinth:AANobbMI:v4PSXean")
+	// Sable
+	implementation(":sable-fabric-26.3:3.0.0")
+	implementation("maven.modrinth:jade:${providers.gradleProperty("jade_version").get()}")
+	implementation(files("libs/forgeconfigapiport-fabric-26.3.1.jar"))
+	// Fabric API. This is technically optional, but you probably want it anyway.
+	implementation("net.fabricmc.fabric-api:fabric-api:${providers.gradleProperty("fabric_api_version").get()}")
+	testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
+	testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.10.2")
 }
 
 tasks.processResources {
@@ -101,12 +45,14 @@ tasks.processResources {
 	}
 }
 
-tasks.withType<JavaCompile>().configureEach {
-	options.release = 21
+tasks.test {
+	useJUnitPlatform()
 }
 
-// The NeoForge sources are kept in the repository as the reference
-// implementation, but are not part of the Fabric source set.
+tasks.withType<JavaCompile>().configureEach {
+	options.release = 25
+}
+
 sourceSets {
 	main {
 		java {
@@ -123,8 +69,8 @@ java {
 	// If you remove this line, sources will not be generated.
 	withSourcesJar()
 
-	sourceCompatibility = JavaVersion.VERSION_21
-	targetCompatibility = JavaVersion.VERSION_21
+	sourceCompatibility = JavaVersion.VERSION_25
+	targetCompatibility = JavaVersion.VERSION_25
 }
 
 tasks.jar {

@@ -8,12 +8,12 @@ import java.util.UUID;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import com.moigferdsrte.ragdoll.fabric.network.FabricPayloadContext;
 
 public record RagdollGrabSyncPacket(UUID playerId, boolean grabbing) implements CustomPacketPayload {
    public static final Type<RagdollGrabSyncPacket> TYPE = new Type<>(
-      ResourceLocation.fromNamespaceAndPath("sable_player_ragdoll", "grab_sync")
+      Identifier.fromNamespaceAndPath("sable_player_ragdoll", "grab_sync")
    );
    private static final StreamCodec<ByteBuf, UUID> UUID_CODEC = StreamCodec.of(
       (buf, uuid) -> { buf.writeLong(uuid.getMostSignificantBits()); buf.writeLong(uuid.getLeastSignificantBits()); },

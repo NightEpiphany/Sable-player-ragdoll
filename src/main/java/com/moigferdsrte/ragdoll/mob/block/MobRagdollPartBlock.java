@@ -12,7 +12,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -49,7 +48,7 @@ public final class MobRagdollPartBlock extends Block implements EntityBlock, Blo
     public <T extends BlockEntity> net.minecraft.world.level.block.entity.BlockEntityTicker<T> getTicker(
             net.minecraft.world.level.Level level, BlockState state,
             net.minecraft.world.level.block.entity.BlockEntityType<T> type) {
-        return level.isClientSide ? null : (world, pos, blockState, be) -> {
+        return level.isClientSide() ? null : (world, pos, blockState, be) -> {
             if (be instanceof RagdollOwnedBlock)
                 RagdollBlockLifetime.tick(be);
         };
@@ -93,17 +92,17 @@ public final class MobRagdollPartBlock extends Block implements EntityBlock, Blo
     }
 
     @Override
-    protected ItemInteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos,
+    protected InteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos,
                                               Player player, InteractionHand hand, BlockHitResult hitResult) {
         if (level instanceof ServerLevel serverLevel) {
             InteractionResult result = level.getBlockEntity(pos) instanceof MobRagdollPartBlockEntity part
                     ? MobRagdollAssembly.interactWithPart(serverLevel, part, player, hand)
                     : MobRagdollAssembly.interactWithPart(serverLevel, pos, player, hand);
             if (result.consumesAction()) {
-                return ItemInteractionResult.SUCCESS;
+                return InteractionResult.SUCCESS;
             }
         }
-        return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
+        return InteractionResult.PASS;
     }
 
     @Override

@@ -5,7 +5,7 @@ import com.moigferdsrte.ragdoll.mob.MobRagdollAssembly;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -13,7 +13,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 public record MobRagdollDespawnPacket(int entityId) implements CustomPacketPayload {
     public static final Type<MobRagdollDespawnPacket> TYPE = new Type<>(
-            ResourceLocation.fromNamespaceAndPath(SablePlayerRagdoll.MOD_ID, "mob_ragdoll_despawn")
+            Identifier.fromNamespaceAndPath(SablePlayerRagdoll.MOD_ID, "mob_ragdoll_despawn")
     );
     public static final StreamCodec<RegistryFriendlyByteBuf, MobRagdollDespawnPacket> STREAM_CODEC = StreamCodec.of(
             MobRagdollDespawnPacket::encode,

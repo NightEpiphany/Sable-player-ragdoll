@@ -21,13 +21,13 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.projectile.AbstractArrow;
-import net.minecraft.world.entity.projectile.Fireball;
-import net.minecraft.world.entity.projectile.LargeFireball;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.entity.projectile.ShulkerBullet;
-import net.minecraft.world.entity.projectile.ThrownTrident;
-import net.minecraft.world.entity.projectile.WitherSkull;
+import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
+import net.minecraft.world.entity.projectile.arrow.ThrownTrident;
+import net.minecraft.world.entity.projectile.hurtingprojectile.Fireball;
+import net.minecraft.world.entity.projectile.hurtingprojectile.LargeFireball;
+import net.minecraft.world.entity.projectile.hurtingprojectile.WitherSkull;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.core.BlockPos;
@@ -55,7 +55,7 @@ public final class RagdollInteractions {
                     && player.pick(5.0, 0.0F, true) instanceof BlockHitResult hit) {
                 blocked = inPlot(serverLevel, hit.getBlockPos()) || inPlot(serverLevel, hit.getBlockPos().relative(hit.getDirection()));
             }
-            return blocked ? net.minecraft.world.InteractionResultHolder.fail(held) : net.minecraft.world.InteractionResultHolder.pass(held);
+            return blocked ? InteractionResult.FAIL : InteractionResult.PASS;
         });
     }
 
@@ -147,7 +147,7 @@ public final class RagdollInteractions {
       if (!(ragdolledEntity instanceof ServerPlayer ragdolledPlayer) || !ragdolledPlayer.isAlive()) return null;
       RagdollSessionManager.RAGDOLL_PIPE_ACTIVE.set(true);
       try {
-         return ragdolledPlayer.interact(clickingPlayer, hand);
+         return ragdolledPlayer.interact(clickingPlayer, hand, ragdolledPlayer.position());
       } finally {
          RagdollSessionManager.RAGDOLL_PIPE_ACTIVE.set(false);
       }
@@ -205,7 +205,7 @@ public final class RagdollInteractions {
 
       MobRagdollAssembly.RAGDOLL_PIPE_ACTIVE.set(true);
       try {
-         boolean hurt = living.hurt(source, damage);
+         boolean hurt = living.hurtServer(level, source, damage);
          if (hurt) {
             MobRagdollAssembly.applyKnockup(level, part.ragdollIdentity().owner());
          }
@@ -230,7 +230,7 @@ public final class RagdollInteractions {
 
       RagdollSessionManager.RAGDOLL_PIPE_ACTIVE.set(true);
       try {
-         return ragdolledPlayer.hurt(source, damage);
+         return ragdolledPlayer.hurtServer(level, source, damage);
       } finally {
          RagdollSessionManager.RAGDOLL_PIPE_ACTIVE.set(false);
       }
@@ -247,8 +247,8 @@ public final class RagdollInteractions {
    }
 
    private static float projectileDamageAmount(Projectile projectile) {
-      // AbstractArrow.getBaseDamage() is already velocity-scaled and covers ThrownTrident (8.0)
-      if (projectile instanceof AbstractArrow arrow) return (float) arrow.getBaseDamage();
+      // Use vanilla's default base arrow damage (2.0) scaled by the current arrow speed.
+      if (projectile instanceof AbstractArrow arrow) return (float) Math.ceil(arrow.getDeltaMovement().length() * 2.0);
       if (projectile instanceof WitherSkull) return 8.0F;
       if (projectile instanceof LargeFireball) return 6.0F;
       if (projectile instanceof Fireball) return 5.0F; // SmallFireball, DragonFireball, etc.

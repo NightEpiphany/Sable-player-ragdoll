@@ -2,7 +2,7 @@ package com.moigferdsrte.ragdoll.compat.jade;
 
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import snownee.jade.api.BlockAccessor;
 import snownee.jade.api.IBlockComponentProvider;
 import snownee.jade.api.ITooltip;
@@ -11,13 +11,13 @@ import snownee.jade.api.config.IPluginConfig;
 public final class MobRagdollPartTooltipProvider implements IBlockComponentProvider {
     public static final MobRagdollPartTooltipProvider INSTANCE = new MobRagdollPartTooltipProvider();
 
-    private static final ResourceLocation UID = ResourceLocation.fromNamespaceAndPath("sable_player_ragdoll", "mob_ragdoll_part");
+    private static final Identifier UID = Identifier.fromNamespaceAndPath("sable_player_ragdoll", "mob_ragdoll_part");
 
     private MobRagdollPartTooltipProvider() {
     }
 
     @Override
-    public ResourceLocation getUid() {
+    public Identifier getUid() {
         return UID;
     }
 
@@ -35,16 +35,16 @@ public final class MobRagdollPartTooltipProvider implements IBlockComponentProvi
 
         tooltip.clear();
 
-        final ResourceLocation entityType = ResourceLocation.tryParse(data.getString("EntityType"));
+        final Identifier entityType = Identifier.tryParse(data.getStringOr("EntityType", ""));
         if (entityType != null) {
             Component name = Component.translatable("entity." + entityType.getNamespace() + "." + entityType.getPath());
-            if (data.getBoolean("Baby")) {
+            if (data.getBooleanOr("Baby", false)) {
                 name = Component.literal("Baby ").append(name);
             }
             tooltip.add(name);
         }
 
-        final String role = data.getString("Role");
+        final String role = data.getStringOr("Role", "");
         if (!role.isBlank() && !"other".equals(role)) {
             tooltip.add(Component.literal(RagdollPartTooltipProvider.formatPartName(role)));
         }

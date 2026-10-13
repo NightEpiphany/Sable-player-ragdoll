@@ -9,6 +9,9 @@ import org.spongepowered.asm.mixin.Mixin;
 abstract class RagdollMouseMixin {
     @WrapMethod(method = "onScroll")
     private void ragdoll$keepGrabSlot(long window, double horizontal, double vertical, Operation<Void> original) {
-        if (Minecraft.getInstance().screen != null || !RagdollGrabClient.isGrabbing()) original.call(window, horizontal, vertical);
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.gui.screen() != null || !RagdollGrabClient.isGrabbing()) {
+            original.call(window, horizontal, vertical);
+        }
     }
 }

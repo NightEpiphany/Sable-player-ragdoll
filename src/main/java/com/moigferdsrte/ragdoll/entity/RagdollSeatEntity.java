@@ -6,8 +6,9 @@ import com.moigferdsrte.ragdoll.physics.RagdollSeatingHelper;
 
 import com.moigferdsrte.ragdoll.block.RagdollPartBlock;
 import com.moigferdsrte.ragdoll.block.RagdollSeatBlock;
+import com.mojang.serialization.Codec;
 import java.util.Optional;
-import net.minecraft.nbt.CompoundTag;
+import net.minecraft.core.UUIDUtil;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.syncher.SynchedEntityData.Builder;
 import net.minecraft.core.BlockPos;
@@ -15,7 +16,11 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.TamableAnimal;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.fabricmc.fabric.api.entity.FakePlayer;
@@ -99,16 +104,16 @@ public final class RagdollSeatEntity extends Entity {
 
    public void tick() {
       super.tick();
-      if (!this.level().isClientSide) {
+      if (!this.level().isClientSide()) {
          this.plotAnchor.ifPresent(anchor -> {
             if (this.position().distanceToSqr(anchor) > 1.0E-6) {
                this.setPos(anchor.x, anchor.y, anchor.z);
             }
          });
 
-         if (this.tickCount > 40 && this.level() instanceof net.minecraft.server.level.ServerLevel serverLevel
-               && com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(this).hasUUID(RagdollBlockLifetime.SOURCE_SESSION)) {
-            var owner = com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(this).getUUID(RagdollBlockLifetime.SOURCE_SESSION);
+         var sessionId = com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(this).read(RagdollBlockLifetime.SOURCE_SESSION, UUIDUtil.CODEC);
+         if (this.tickCount > 40 && this.level() instanceof ServerLevel serverLevel && sessionId.isPresent()) {
+            var owner = sessionId.get();
             var root = ragdollRoot(serverLevel, owner);
             if (root == null) {
                for (var passenger : java.util.List.copyOf(getPassengers())) {
@@ -150,23 +155,35 @@ public final class RagdollSeatEntity extends Entity {
    protected void defineSynchedData(Builder builder) {
    }
 
-   protected void readAdditionalSaveData(CompoundTag tag) {
-      hiddenRider = tag.hasUUID("HiddenRider") ? tag.getUUID("HiddenRider") : null;
-      riderWasInvisible = tag.getBoolean("RiderWasInvisible");
-      if (tag.contains(ANCHOR_X_KEY) && tag.contains(ANCHOR_Y_KEY) && tag.contains(ANCHOR_Z_KEY)) {
-         this.plotAnchor = Optional.of(new Vec3(tag.getDouble(ANCHOR_X_KEY), tag.getDouble(ANCHOR_Y_KEY), tag.getDouble(ANCHOR_Z_KEY)));
+   @Override
+   public boolean hurtServer(ServerLevel level, DamageSource source, float damage) {
+      return false;
+   }
+
+   @Override
+   protected void readAdditionalSaveData(ValueInput input) {
+      hiddenRider = input.read("HiddenRider", UUIDUtil.CODEC).orElse(null);
+      riderWasInvisible = input.getBooleanOr("RiderWasInvisible", false);
+      Optional<Double> anchorX = input.read(ANCHOR_X_KEY, Codec.DOUBLE);
+      Optional<Double> anchorY = input.read(ANCHOR_Y_KEY, Codec.DOUBLE);
+      Optional<Double> anchorZ = input.read(ANCHOR_Z_KEY, Codec.DOUBLE);
+      if (anchorX.isPresent() && anchorY.isPresent() && anchorZ.isPresent()) {
+         this.plotAnchor = Optional.of(new Vec3(anchorX.get(), anchorY.get(), anchorZ.get()));
+      } else {
+         this.plotAnchor = Optional.empty();
       }
    }
 
-   protected void addAdditionalSaveData(CompoundTag tag) {
+   @Override
+   protected void addAdditionalSaveData(ValueOutput output) {
       if (hiddenRider != null) {
-         tag.putUUID("HiddenRider", hiddenRider);
-         tag.putBoolean("RiderWasInvisible", riderWasInvisible);
+         output.store("HiddenRider", UUIDUtil.CODEC, hiddenRider);
+         output.putBoolean("RiderWasInvisible", riderWasInvisible);
       }
       this.plotAnchor.ifPresent(anchor -> {
-         tag.putDouble(ANCHOR_X_KEY, anchor.x);
-         tag.putDouble(ANCHOR_Y_KEY, anchor.y);
-         tag.putDouble(ANCHOR_Z_KEY, anchor.z);
+         output.putDouble(ANCHOR_X_KEY, anchor.x);
+         output.putDouble(ANCHOR_Y_KEY, anchor.y);
+         output.putDouble(ANCHOR_Z_KEY, anchor.z);
       });
    }
 

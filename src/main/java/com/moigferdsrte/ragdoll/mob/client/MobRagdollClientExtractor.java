@@ -4,21 +4,25 @@ import com.moigferdsrte.ragdoll.mob.block.MobPartRole;
 import com.moigferdsrte.ragdoll.mob.model.ExtractedMobModel;
 import com.moigferdsrte.ragdoll.mob.model.ExtractedMobModel.PartRole;
 import com.moigferdsrte.ragdoll.mob.model.RenderedModelExtractor;
+import com.moigferdsrte.ragdoll.mob.client.ModelPartMask.SavedPart;
 import com.moigferdsrte.ragdoll.fabric.network.MobRagdollSpawnPacket;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.model.AgeableListModel;
 import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
+import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
+import net.minecraft.client.model.geom.ModelPart;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.level.storage.TagValueOutput;
 import com.moigferdsrte.ragdoll.fabric.network.FabricClientNetwork;
 
 public final class MobRagdollClientExtractor {
@@ -44,31 +48,30 @@ public final class MobRagdollClientExtractor {
     @SuppressWarnings({"rawtypes", "unchecked"})
     public static void extractAndSend(LivingEntity livingEntity) {
         Minecraft minecraft = Minecraft.getInstance();
-        EntityRenderer<? super LivingEntity> renderer =
-                (EntityRenderer<? super LivingEntity>) minecraft.getEntityRenderDispatcher().getRenderer(livingEntity);
+        EntityRenderer<? super LivingEntity, ?> renderer = minecraft.getEntityRenderDispatcher().getRenderer(livingEntity);
         if (!(renderer instanceof LivingEntityRenderer livingRenderer)) {
             return;
         }
 
         EntityModel<?> model = livingRenderer.getModel();
-        ResourceLocation texture = livingRenderer.getTextureLocation(livingEntity);
-
-        float bodyYaw = livingEntity.yBodyRot;
-        float limbSwing = livingEntity.walkAnimation.position(0.0F);
-        float limbSwingAmount = livingEntity.walkAnimation.speed(0.0F);
-        float headYaw = livingEntity.getYHeadRot() - bodyYaw;
-        float headPitch = livingEntity.getXRot();
-        EntityModel rawModel = model;
-        rawModel.young = livingEntity.isBaby();
+        LivingEntityRenderState renderState = (LivingEntityRenderState) livingRenderer.createRenderState(livingEntity, 0.0F);
+        Identifier texture = livingRenderer.getTextureLocation(renderState);
+        float bodyYaw = renderState.bodyRot;
 
         ExtractedMobModel extracted;
         ExtractedMobModel animated;
+        List<SavedPart> savedParts = new ArrayList<>(model.allParts().size());
         try (EmfVanillaModelCompat.Session ignored = EmfVanillaModelCompat.enter(model)) {
-            rawModel.prepareMobModel(livingEntity, limbSwing, limbSwingAmount, 0.0F);
-            rawModel.setupAnim(livingEntity, limbSwing, limbSwingAmount, (float) livingEntity.tickCount, headYaw, headPitch);
-
+            for (var modelPart : model.allParts()) {
+                savedParts.add(ModelPartMask.save(modelPart));
+            }
+            ((EntityModel) model).setupAnim(renderState);
             extracted = RenderedModelExtractor.extract(model);
             animated = RenderedModelExtractor.extractAnimated(model);
+        } finally {
+            for (SavedPart savedPart : savedParts) {
+                savedPart.restore();
+            }
         }
 
         Map<String, ExtractedMobModel.ExtractedPart> animatedByName = animated
@@ -77,7 +80,7 @@ public final class MobRagdollClientExtractor {
 
         CompoundTag variantData = renderVariantData(livingEntity);
         boolean baby = livingEntity.isBaby();
-        float modelScale = getModelScale(livingEntity, livingRenderer, model, extracted);
+        float modelScale = getModelScale(livingEntity, livingRenderer, renderState, extracted);
         Map<String, ExtractedMobModel.ExtractedPart> staticByName = extracted.parts().stream()
                 .collect(Collectors.toMap(ExtractedMobModel.ExtractedPart::name, p -> p, (first, second) -> first));
         List<MobRagdollSpawnPacket.Part> parts = extracted.parts().stream()
@@ -95,7 +98,7 @@ public final class MobRagdollClientExtractor {
         if (!parts.isEmpty()) {
             FabricClientNetwork.sendToServer(new MobRagdollSpawnPacket(
                     livingEntity.getId(),
-                    livingEntity.getType().builtInRegistryHolder().key().location().toString(),
+                    livingEntity.getType().builtInRegistryHolder().key().identifier().toString(),
                     bodyYaw,
                     parts
             ));
@@ -103,7 +106,9 @@ public final class MobRagdollClientExtractor {
     }
 
     static CompoundTag renderVariantData(LivingEntity livingEntity) {
-        CompoundTag tag = livingEntity.saveWithoutId(new CompoundTag());
+        TagValueOutput output = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, livingEntity.registryAccess());
+        livingEntity.saveWithoutId(output);
+        CompoundTag tag = output.buildResult();
         stripAgeData(tag);
         return tag;
     }
@@ -120,7 +125,7 @@ public final class MobRagdollClientExtractor {
     private static MobRagdollSpawnPacket.Part toPacketPart(
             ExtractedMobModel.ExtractedPart part,
             ExtractedMobModel.ExtractedPart animatedPart,
-            ResourceLocation texture,
+            Identifier texture,
             List<String> keepPartNames,
         CompoundTag variantData,
         float modelScale,
@@ -189,7 +194,7 @@ public final class MobRagdollClientExtractor {
     }
 
     static List<String> keepPartNames(ExtractedMobModel extracted, ExtractedMobModel.ExtractedPart part) {
-        List<String> names = new ArrayList<>();
+        List<String> names = new ArrayList<>(extracted.parts().size());
         names.add(part.name());
         boolean changed;
         do {
@@ -214,11 +219,15 @@ public final class MobRagdollClientExtractor {
         return parent != null && parent.role() == part.role();
     }
 
-    private static float getModelScale(LivingEntity livingEntity, LivingEntityRenderer<?, ?> renderer, EntityModel<?> model, ExtractedMobModel extracted) {
-        float rendererScale = probeRendererScale(renderer, livingEntity);
-        boolean ageableModelHandlesBabyScale = model instanceof AgeableListModel<?> && model.young;
+    private static float getModelScale(
+            LivingEntity livingEntity,
+            LivingEntityRenderer<?, ?, ?> renderer,
+            LivingEntityRenderState renderState,
+            ExtractedMobModel extracted
+    ) {
+        float rendererScale = probeRendererScale(renderer, renderState);
         boolean rendererHandlesBabyScale = livingEntity.isBaby() && rendererScaleDiffersFromBase(rendererScale, renderer, livingEntity);
-        if (livingEntity.isBaby() && !ageableModelHandlesBabyScale && !rendererHandlesBabyScale) {
+        if (livingEntity.isBaby() && !rendererHandlesBabyScale) {
             float boundsScale = getBoundingBoxScale(livingEntity, extracted);
             if (Float.isFinite(boundsScale) && boundsScale > 0.05F) {
                 return rendererScale * boundsScale;
@@ -232,7 +241,7 @@ public final class MobRagdollClientExtractor {
     private static java.lang.reflect.Method resolveScaleMethod() {
         try {
             java.lang.reflect.Method method = LivingEntityRenderer.class.getDeclaredMethod(
-                    "scale", LivingEntity.class, PoseStack.class, float.class);
+                    "scale", LivingEntityRenderState.class, PoseStack.class);
             method.setAccessible(true);
             return method;
         } catch (NoSuchMethodException ignored) {
@@ -240,13 +249,13 @@ public final class MobRagdollClientExtractor {
         }
     }
 
-    private static float probeRendererScale(LivingEntityRenderer<?, ?> renderer, LivingEntity entity) {
+    private static float probeRendererScale(LivingEntityRenderer<?, ?, ?> renderer, LivingEntityRenderState renderState) {
         if (SCALE_METHOD == null) {
             return getRendererScale(renderer);
         }
         try {
             PoseStack poseStack = new PoseStack();
-            SCALE_METHOD.invoke(renderer, entity, poseStack, 1.0F);
+            SCALE_METHOD.invoke(renderer, renderState, poseStack);
             org.joml.Vector3f scale = poseStack.last().pose().getScale(new org.joml.Vector3f());
             float average = (Math.abs(scale.x) + Math.abs(scale.y) + Math.abs(scale.z)) / 3.0F;
             return Float.isFinite(average) && average > 1.0E-4F ? average : 1.0F;
@@ -255,7 +264,7 @@ public final class MobRagdollClientExtractor {
         }
     }
 
-    private static boolean rendererScaleDiffersFromBase(float rendererScale, LivingEntityRenderer<?, ?> renderer, LivingEntity entity) {
+    private static boolean rendererScaleDiffersFromBase(float rendererScale, LivingEntityRenderer<?, ?, ?> renderer, LivingEntity entity) {
         float baseScale = getRendererScale(renderer) * entity.getScale();
         return Float.isFinite(rendererScale)
                 && Float.isFinite(baseScale)
@@ -295,7 +304,7 @@ public final class MobRagdollClientExtractor {
         return Float.isFinite(heightScale) ? heightScale : widthScale;
     }
 
-    private static float getRendererScale(LivingEntityRenderer<?, ?> renderer) {
+    private static float getRendererScale(LivingEntityRenderer<?, ?, ?> renderer) {
         for (Class<?> c = renderer.getClass(); c != Object.class; c = c.getSuperclass()) {
             try {
                 java.lang.reflect.Field field = c.getDeclaredField("SCALE");

@@ -12,23 +12,28 @@ import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 
 @Mixin(Entity.class)
 public abstract class EntityRagdollHiddenMixin {
-    @org.spongepowered.asm.mixin.Unique private AABB ragdoll$bounds;
-    @org.spongepowered.asm.mixin.Unique private double ragdoll$boundsX, ragdoll$boundsY, ragdoll$boundsZ;
-    @org.spongepowered.asm.mixin.Unique
+    @Unique private AABB ragdoll$bounds;
+    @Unique private double ragdoll$boundsX, ragdoll$boundsY, ragdoll$boundsZ;
+    @Unique
     private static final EntityDimensions RAGDOLL_SOURCE_DIMENSIONS = EntityDimensions.fixed(0.01F, 0.01F).withEyeHeight(0.0F);
+    @Unique
     private static final double RAGDOLL_SOURCE_BB_HALF_SIZE = 0.0005;
 
+    @Unique
     private boolean isHiddenRagdollSource() {
         return isHiddenRagdollSource((Entity) (Object) this);
     }
 
+    @Unique
     private static boolean isHiddenRagdollSource(Entity self) {
         if (self.level().isClientSide()) {
             if (self instanceof Player && self.isInvisible() && self.getVehicle() instanceof RagdollSeatEntity) {
@@ -43,6 +48,7 @@ public abstract class EntityRagdollHiddenMixin {
                 && com.moigferdsrte.ragdoll.mob.MobRagdollSourceRecovery.active(living);
     }
 
+    @Unique
     private static boolean ragdollPipeActive() {
         return RagdollSessionManager.RAGDOLL_PIPE_ACTIVE.get() || MobRagdollAssembly.RAGDOLL_PIPE_ACTIVE.get();
     }
@@ -64,19 +70,19 @@ public abstract class EntityRagdollHiddenMixin {
     }
 
     @WrapMethod(method = "interact")
-    private InteractionResult blockDirectInteract(Player player, InteractionHand hand, Operation<InteractionResult> original) {
+    private InteractionResult blockDirectInteract(Player player, InteractionHand hand, Vec3 location, Operation<InteractionResult> original) {
         if (!ragdollPipeActive() && isHiddenRagdollSource()) {
             return InteractionResult.FAIL;
         }
 
-        return original.call(player, hand);
+        return original.call(player, hand, location);
     }
 
     @WrapMethod(method = "canBeCollidedWith")
-    private boolean hideFromCollisionPicking(Operation<Boolean> original) {
+    private boolean hideFromCollisionPicking(Entity other, Operation<Boolean> original) {
         if (isHiddenRagdollSource()) return false;
 
-        return original.call();
+        return original.call(other);
     }
 
     @WrapMethod(method = "canCollideWith")

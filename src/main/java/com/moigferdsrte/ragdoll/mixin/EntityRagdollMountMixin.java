@@ -16,13 +16,13 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 
 @Mixin(Entity.class)
 public abstract class EntityRagdollMountMixin {
-    @WrapMethod(method = "startRiding(Lnet/minecraft/world/entity/Entity;Z)Z")
-    private boolean sable_player_ragdoll$denyMountingConvertedMob(Entity vehicle, boolean force, Operation<Boolean> original) {
+    @WrapMethod(method = "startRiding(Lnet/minecraft/world/entity/Entity;ZZ)Z")
+    private boolean sable_player_ragdoll$denyMountingConvertedMob(Entity vehicle, boolean force, boolean sendEventAndTriggers, Operation<Boolean> original) {
         Entity self = (Entity) (Object) this;
         if (vehicle instanceof LivingEntity living && MobRagdollAssembly.isPendingOrConverted(living)) {
             return false;
         }
-        return original.call(vehicle, force);
+        return original.call(vehicle, force, sendEventAndTriggers);
     }
 
     @WrapMethod(method = "stopRiding")

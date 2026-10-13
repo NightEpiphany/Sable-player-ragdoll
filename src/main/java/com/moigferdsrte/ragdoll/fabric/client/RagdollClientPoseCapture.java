@@ -5,11 +5,11 @@ import com.moigferdsrte.ragdoll.api.RagdollLimbOptions;
 import com.moigferdsrte.ragdoll.block.entity.RagdollPartBlockEntity.BodyPart;
 import com.moigferdsrte.ragdoll.mob.client.EmfVanillaModelCompat;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.model.PlayerModel;
+import net.minecraft.client.model.player.PlayerModel;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.player.AbstractClientPlayer;
-import net.minecraft.client.renderer.entity.EntityRenderer;
-import net.minecraft.client.renderer.entity.player.PlayerRenderer;
+import net.minecraft.client.renderer.entity.player.AvatarRenderer;
+import net.minecraft.client.renderer.entity.state.AvatarRenderState;
 import net.minecraft.util.Mth;
 
 public final class RagdollClientPoseCapture {
@@ -23,19 +23,16 @@ public final class RagdollClientPoseCapture {
          return RagdollLimbOptions.defaults();
       }
 
-      EntityRenderer<?> renderer = minecraft.getEntityRenderDispatcher().getRenderer(player);
-      if (!(renderer instanceof PlayerRenderer playerRenderer)) {
+      if (!(minecraft.getEntityRenderDispatcher().getRenderer(player) instanceof AvatarRenderer<?> playerRenderer)) {
          return RagdollLimbOptions.defaults();
       }
 
       float partialTick = 1.0F;
-      float limbSwing = player.walkAnimation.position(partialTick);
-      float limbSwingAmount = Math.min(player.walkAnimation.speed(partialTick), 1.0F);
-
-      PlayerModel<AbstractClientPlayer> model = playerRenderer.getModel();
+      AvatarRenderState state = new AvatarRenderState();
+      extractState(playerRenderer, player, state, partialTick);
+      PlayerModel model = playerRenderer.getModel();
       try (EmfVanillaModelCompat.Session ignored = EmfVanillaModelCompat.enter(model)) {
-         model.prepareMobModel(player, limbSwing, limbSwingAmount, partialTick);
-         model.setupAnim(player, limbSwing, limbSwingAmount, (float) player.tickCount, player.getYHeadRot() - player.yBodyRot, player.getXRot());
+         model.setupAnim(state);
 
          return RagdollLimbOptions.builder()
             .limb(BodyPart.HEAD, pose(model.head))
@@ -46,6 +43,11 @@ public final class RagdollClientPoseCapture {
             .limb(BodyPart.RIGHT_LEG, pose(model.rightLeg))
             .build();
       }
+   }
+
+   @SuppressWarnings({"rawtypes", "unchecked"})
+   private static void extractState(AvatarRenderer renderer, AbstractClientPlayer player, AvatarRenderState state, float partialTick) {
+      renderer.extractRenderState(player, state, partialTick);
    }
 
    private static RagdollLimbConfig pose(ModelPart part) {

@@ -60,7 +60,7 @@ public class SablePlayerRagdollFabric implements ModInitializer {
     }
 
     private static void registerServerCallbacks() {
-        ServerTickEvents.END_WORLD_TICK.register(level -> {
+        ServerTickEvents.END_LEVEL_TICK.register(level -> {
             RagdollRelationships.discover(level);
             MobRagdollAssembly.tickActiveRagdolls(level);
         });
@@ -81,7 +81,7 @@ public class SablePlayerRagdollFabric implements ModInitializer {
                 MobRagdollAssembly.syncClientSourceState(player, entity));
         ServerEntityEvents.EQUIPMENT_CHANGE.register((entity, slot, from, to) -> {
             if (!(entity instanceof ServerPlayer player)) return;
-            ServerLevel level = player.serverLevel();
+            ServerLevel level = player.level();
             ServerSubLevel ragdoll = RagdollSessionManager.activeRagdollForPlayer(level, player.getUUID());
             if (ragdoll == null) return;
             for (java.util.UUID partId : RagdollAssemblyHelper.linkedParts(level, ragdoll.getUniqueId())) {
@@ -120,21 +120,21 @@ public class SablePlayerRagdollFabric implements ModInitializer {
         });
         UseBlockCallback.EVENT.register((player, level, hand, hit) -> {
             if (level.isClientSide() || !(player instanceof ServerPlayer serverPlayer)) return InteractionResult.PASS;
-            return RagdollSessionManager.activeRagdollForPlayer(serverPlayer.serverLevel(), serverPlayer.getUUID()) != null
+            return RagdollSessionManager.activeRagdollForPlayer(serverPlayer.level(), serverPlayer.getUUID()) != null
                     ? InteractionResult.FAIL : InteractionResult.PASS;
         });
         UseItemCallback.EVENT.register((player, level, hand) -> {
             if (!level.isClientSide() && player instanceof ServerPlayer serverPlayer
-                    && RagdollSessionManager.activeRagdollForPlayer(serverPlayer.serverLevel(), serverPlayer.getUUID()) != null) {
-                return net.minecraft.world.InteractionResultHolder.fail(player.getItemInHand(hand));
+                    && RagdollSessionManager.activeRagdollForPlayer(serverPlayer.level(), serverPlayer.getUUID()) != null) {
+                return InteractionResult.FAIL;
             }
-            return net.minecraft.world.InteractionResultHolder.pass(player.getItemInHand(hand));
+            return InteractionResult.PASS;
         });
     }
 
     private static void onLivingDeath(LivingEntity entity, DamageSource source) {
         if (entity instanceof ServerPlayer player) {
-            ServerLevel level = player.serverLevel();
+            ServerLevel level = player.level();
             RagdollBlockOwnership.withOwner(RagdollBlockOwnership.ownerForPlayer(level, player.getUUID()), () -> {
                 ServerSubLevel ragdoll = RagdollSessionManager.activeRagdollForPlayer(level, player.getUUID());
                 if (ragdoll != null) RagdollExpireHelper.expire(level, ragdoll, "player died");
@@ -147,8 +147,8 @@ public class SablePlayerRagdollFabric implements ModInitializer {
         Vec3 away = mob.position().subtract(killer.position());
         if (away.lengthSqr() < 1.0E-6) away = killer.getLookAngle();
         Vec3 impulse = away.normalize().scale(4.5);
-        Vec3 rotation = new Vec3(level.random.nextDouble() * 4.0 - 2.0,
-                level.random.nextDouble() * 4.0 - 2.0, level.random.nextDouble() * 4.0 - 2.0);
+        Vec3 rotation = new Vec3(level.getRandom().nextDouble() * 4.0 - 2.0,
+                level.getRandom().nextDouble() * 4.0 - 2.0, level.getRandom().nextDouble() * 4.0 - 2.0);
         RagdollAPI.launchMob(level, mob, mob.getDeltaMovement().add(impulse), rotation,
                 com.moigferdsrte.ragdoll.mob.api.MobRagdollLaunchOptions.defaults());
     }

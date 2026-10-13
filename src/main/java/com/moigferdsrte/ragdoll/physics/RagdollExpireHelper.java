@@ -11,6 +11,8 @@ import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import dev.ryanhcode.sable.sublevel.plot.ServerLevelPlot;
 import dev.ryanhcode.sable.sublevel.system.SubLevelPhysicsSystem;
 import java.util.UUID;
+import java.util.Set;
+import net.minecraft.core.UUIDUtil;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
@@ -63,8 +65,8 @@ public final class RagdollExpireHelper {
       if (entity instanceof LivingEntity livingEntity) {
          if (livingEntity.getVehicle() != null) {
             var seatTag = com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(livingEntity.getVehicle());
-            if (seatTag.hasUUID(RagdollBlockLifetime.SOURCE_SESSION)
-                  && !RagdollBlockOwnership.sessionId(subLevel).equals(seatTag.getUUID(RagdollBlockLifetime.SOURCE_SESSION))) return;
+            UUID sessionId = seatTag.read(RagdollBlockLifetime.SOURCE_SESSION, UUIDUtil.CODEC).orElse(null);
+            if (sessionId != null && !RagdollBlockOwnership.sessionId(subLevel).equals(sessionId)) return;
          }
          Vec3 releasePosition = releasePosition(level, subLevel);
          Vec3 inheritedVelocity = sublevelVelocityAsBlocksPerTick(level, subLevel);
@@ -74,7 +76,7 @@ public final class RagdollExpireHelper {
          }
          if (releasePosition != null) {
             if (livingEntity instanceof ServerPlayer player) {
-               player.teleportTo(level, releasePosition.x, releasePosition.y, releasePosition.z, player.getYRot(), player.getXRot());
+               player.teleportTo(level, releasePosition.x, releasePosition.y, releasePosition.z, Set.of(), player.getYRot(), player.getXRot(), false);
             } else {
                livingEntity.teleportTo(releasePosition.x, releasePosition.y, releasePosition.z);
             }
@@ -121,8 +123,8 @@ public final class RagdollExpireHelper {
       if (bounds != null) {
          for (RagdollSeatEntity seat : level.getEntitiesOfClass(RagdollSeatEntity.class, bounds)) {
             var seatTag = com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(seat);
-            if (!seatTag.hasUUID(RagdollBlockLifetime.SOURCE_SESSION)
-                  || !RagdollBlockOwnership.sessionId(subLevel).equals(seatTag.getUUID(RagdollBlockLifetime.SOURCE_SESSION))) continue;
+            if (!RagdollBlockOwnership.sessionId(subLevel).equals(
+                  seatTag.read(RagdollBlockLifetime.SOURCE_SESSION, UUIDUtil.CODEC).orElse(null))) continue;
             seat.ejectPassengers();
             seat.discard();
          }

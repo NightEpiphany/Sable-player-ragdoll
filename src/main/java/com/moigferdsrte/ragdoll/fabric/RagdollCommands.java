@@ -8,7 +8,6 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
-import com.mojang.authlib.yggdrasil.ProfileResult;
 import com.moigferdsrte.ragdoll.SablePlayerRagdoll;
 import com.moigferdsrte.ragdoll.RagdollItemTags;
 import com.moigferdsrte.ragdoll.DeletingStick;
@@ -26,14 +25,17 @@ import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.commands.arguments.GameProfileArgument;
-import net.minecraft.commands.arguments.ResourceLocationArgument;
+import net.minecraft.commands.arguments.IdentifierArgument;
 import net.minecraft.commands.arguments.coordinates.Vec3Argument;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.players.NameAndId;
+import net.minecraft.server.permissions.Permissions;
+import net.minecraft.util.Prediction;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -51,7 +53,7 @@ public final class RagdollCommands {
       dispatcher.register(RagdollCommand.build());
       dispatcher.register(
          Commands.literal("sable_player_ragdoll")
-            .requires(source -> source.hasPermission(2))
+            .requires(source -> source.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
             .then(Commands.literal("dummy")
                .executes(context -> spawnDummyRagdoll(
                   context.getSource(),
@@ -124,17 +126,17 @@ public final class RagdollCommands {
                )
             )
             .then(Commands.literal("mobless")
-               .then(Commands.argument("entity", ResourceLocationArgument.id())
+               .then(Commands.argument("entity", IdentifierArgument.id())
                   .suggests((context, builder) -> SharedSuggestionProvider.suggestResource(BuiltInRegistries.ENTITY_TYPE.keySet(), builder))
                   .executes(context -> spawnMoblessRagdoll(
                      context.getSource(),
-                     ResourceLocationArgument.getId(context, "entity"),
+                     IdentifierArgument.getId(context, "entity"),
                      context.getSource().getPosition()
                   ))
                   .then(Commands.argument("pos", Vec3Argument.vec3())
                      .executes(context -> spawnMoblessRagdoll(
                         context.getSource(),
-                        ResourceLocationArgument.getId(context, "entity"),
+                        IdentifierArgument.getId(context, "entity"),
                         Vec3Argument.getVec3(context, "pos")
                      )))))
             .then(Commands.literal("wailing")
@@ -187,11 +189,11 @@ public final class RagdollCommands {
                   .executes(context -> clearMobRagdollBlacklist(context.getSource())))
                .then(Commands.literal("add")
                   .then(Commands.literal("entity")
-                     .then(Commands.argument("entity", ResourceLocationArgument.id())
+                     .then(Commands.argument("entity", IdentifierArgument.id())
                         .suggests((context, builder) -> SharedSuggestionProvider.suggestResource(BuiltInRegistries.ENTITY_TYPE.keySet(), builder))
                         .executes(context -> addMobRagdollBlacklistEntity(
                            context.getSource(),
-                           ResourceLocationArgument.getId(context, "entity")
+                           IdentifierArgument.getId(context, "entity")
                         ))))
                   .then(Commands.literal("mod")
                      .then(Commands.argument("namespace", StringArgumentType.word())
@@ -202,11 +204,11 @@ public final class RagdollCommands {
                         )))))
                .then(Commands.literal("remove")
                   .then(Commands.literal("entity")
-                     .then(Commands.argument("entity", ResourceLocationArgument.id())
+                     .then(Commands.argument("entity", IdentifierArgument.id())
                         .suggests((context, builder) -> SharedSuggestionProvider.suggestResource(BuiltInRegistries.ENTITY_TYPE.keySet(), builder))
                         .executes(context -> removeMobRagdollBlacklistEntity(
                            context.getSource(),
-                           ResourceLocationArgument.getId(context, "entity")
+                           IdentifierArgument.getId(context, "entity")
                         ))))
                   .then(Commands.literal("mod")
                      .then(Commands.argument("namespace", StringArgumentType.word())
@@ -222,7 +224,7 @@ public final class RagdollCommands {
       );
    }
 
-   private static int addMobRagdollBlacklistEntity(CommandSourceStack source, ResourceLocation entityId) {
+   private static int addMobRagdollBlacklistEntity(CommandSourceStack source, Identifier entityId) {
       MobRagdollBlacklistSavedData data = MobRagdollBlacklistSavedData.get(source.getLevel());
       if (!data.addEntity(entityId)) {
          source.sendFailure(Component.literal(entityId + " is already in the mob ragdoll blacklist."));
@@ -232,7 +234,7 @@ public final class RagdollCommands {
       return 1;
    }
 
-   private static int removeMobRagdollBlacklistEntity(CommandSourceStack source, ResourceLocation entityId) {
+   private static int removeMobRagdollBlacklistEntity(CommandSourceStack source, Identifier entityId) {
       MobRagdollBlacklistSavedData data = MobRagdollBlacklistSavedData.get(source.getLevel());
       if (!data.removeEntity(entityId)) {
          source.sendFailure(Component.literal(entityId + " was not in the mob ragdoll blacklist."));
@@ -302,7 +304,7 @@ public final class RagdollCommands {
    private static CompletableFuture<Suggestions> suggestEntityNamespaces(CommandContext<CommandSourceStack> context, SuggestionsBuilder builder) {
       return SharedSuggestionProvider.suggest(
          BuiltInRegistries.ENTITY_TYPE.keySet().stream()
-            .map(ResourceLocation::getNamespace)
+            .map(Identifier::getNamespace)
             .distinct()
             .sorted(),
          builder
@@ -420,8 +422,9 @@ public final class RagdollCommands {
       }
    }
 
-   private static GameProfile firstProfile(Collection<GameProfile> profiles) {
-      return profiles.iterator().next();
+   private static GameProfile firstProfile(Collection<NameAndId> profiles) {
+      NameAndId profile = profiles.iterator().next();
+      return new GameProfile(profile.id(), profile.name());
    }
 
    private static LiteralArgumentBuilder<CommandSourceStack> despawnOptions(DummyDespawnCommand command) {
@@ -445,23 +448,22 @@ public final class RagdollCommands {
    }
 
    private static GameProfile resolveSkinProfile(CommandSourceStack source, GameProfile profile) {
-      if (!profile.getProperties().get("textures").isEmpty() || profile.getId() == null) {
+      if (!profile.properties().get("textures").isEmpty() || profile.id() == null) {
          return profile;
       }
 
       try {
-         ProfileResult result = source.getServer().getSessionService().fetchProfile(profile.getId(), true);
-         if (result != null && !result.profile().getProperties().get("textures").isEmpty()) {
-            return result.profile();
-         }
+         return source.getServer().services().profileResolver().fetchById(profile.id())
+            .filter(resolved -> !resolved.properties().get("textures").isEmpty())
+            .orElse(profile);
       } catch (Throwable error) {
-         SablePlayerRagdoll.LOGGER.warn("[sable_player_ragdoll] failed to resolve skin for {}: {}", profile.getName(), error.toString());
+         SablePlayerRagdoll.LOGGER.warn("[sable_player_ragdoll] failed to resolve skin for {}: {}", profile.name(), error.toString());
       }
 
       return profile;
    }
 
-   private static int spawnMoblessRagdoll(CommandSourceStack source, ResourceLocation entityId, Vec3 pos) {
+   private static int spawnMoblessRagdoll(CommandSourceStack source, Identifier entityId, Vec3 pos) {
       EntityType<?> type = BuiltInRegistries.ENTITY_TYPE.getOptional(entityId).orElse(null);
       if (type == null) {
          source.sendFailure(Component.literal("Unknown entity type: " + entityId));
@@ -495,7 +497,7 @@ public final class RagdollCommands {
       stack.set(DataComponents.CUSTOM_NAME, Component.literal("Ragdolling Stick"));
 
       if (!player.getInventory().add(stack)) {
-         player.drop(stack, false);
+         player.drop(stack, false, Prediction.PREDICTED);
       }
       source.sendSuccess(() -> Component.literal("Gave ragdolling stick"), true);
       return 1;
@@ -505,7 +507,7 @@ public final class RagdollCommands {
       ServerPlayer player = source.getPlayerOrException();
       ItemStack stack = DeletingStick.create();
       if (!player.getInventory().add(stack)) {
-         player.drop(stack, false);
+         player.drop(stack, false, Prediction.PREDICTED);
       }
       source.sendSuccess(() -> Component.literal("Gave deleting stick (left-click deletes, right-click dismembers)"), true);
       return 1;

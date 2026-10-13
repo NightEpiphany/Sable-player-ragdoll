@@ -12,7 +12,20 @@ final class ModelPartMask {
     }
 
     static SavedPart save(ModelPart part) {
-        return new SavedPart(part, part.x, part.y, part.z, part.xRot, part.yRot, part.zRot, part.visible, cubes(part));
+        return new SavedPart(
+                part,
+                part.x,
+                part.y,
+                part.z,
+                part.xRot,
+                part.yRot,
+                part.zRot,
+                part.xScale,
+                part.yScale,
+                part.zScale,
+                part.visible,
+                part.skipDraw,
+                cubes(part));
     }
 
     static void hideCubes(ModelPart part) {
@@ -21,12 +34,15 @@ final class ModelPartMask {
 
     static void resetToInitialPose(ModelPart part) {
         var initial = part.getInitialPose();
-        part.x = initial.x;
-        part.y = initial.y;
-        part.z = initial.z;
-        part.xRot = initial.xRot;
-        part.yRot = initial.yRot;
-        part.zRot = initial.zRot;
+        part.x = initial.x();
+        part.y = initial.y();
+        part.z = initial.z();
+        part.xRot = initial.xRot();
+        part.yRot = initial.yRot();
+        part.zRot = initial.zRot();
+        part.xScale = initial.xScale();
+        part.yScale = initial.yScale();
+        part.zScale = initial.zScale();
     }
 
     @SuppressWarnings("unchecked")
@@ -57,7 +73,8 @@ final class ModelPartMask {
 
     record SavedPart(ModelPart part, float x, float y, float z,
                      float xRot, float yRot, float zRot,
-                     boolean visible, List<ModelPart.Cube> cubes) {
+                     float xScale, float yScale, float zScale,
+                     boolean visible, boolean skipDraw, List<ModelPart.Cube> cubes) {
         void restore() {
             this.part.x = this.x;
             this.part.y = this.y;
@@ -65,7 +82,11 @@ final class ModelPartMask {
             this.part.xRot = this.xRot;
             this.part.yRot = this.yRot;
             this.part.zRot = this.zRot;
+            this.part.xScale = this.xScale;
+            this.part.yScale = this.yScale;
+            this.part.zScale = this.zScale;
             this.part.visible = this.visible;
+            this.part.skipDraw = this.skipDraw;
             setCubes(this.part, this.cubes);
         }
     }

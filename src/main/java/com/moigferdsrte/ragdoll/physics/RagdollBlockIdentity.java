@@ -1,7 +1,10 @@
 package com.moigferdsrte.ragdoll.physics;
 
 import java.util.UUID;
+import net.minecraft.core.UUIDUtil;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import org.jetbrains.annotations.Nullable;
 
 public final class RagdollBlockIdentity {
@@ -96,43 +99,42 @@ public final class RagdollBlockIdentity {
         severed = true;
     }
 
-    public void save(CompoundTag tag) {
-        CompoundTag identity = new CompoundTag();
+    public void save(ValueOutput output) {
+        ValueOutput identity = output.child(KEY);
         identity.putInt("Version", 3);
-        if (parent != null) identity.putUUID("Parent", parent);
+        identity.storeNullable("Parent", UUIDUtil.CODEC, parent);
         identity.putLong("OrphanDeadline", orphanDeadline);
         identity.putLong("CreatedAt", createdAt);
         identity.putLong("ExpiresAt", expiresAt);
         identity.putString("Lifetime", lifetime);
-        if (source != null) identity.putUUID("Source", source);
-        identity.put("Session", session.copy());
-        identity.put("Assembly", assembly.copy());
-        if (owner != null) identity.putUUID("Owner", owner);
-        if (limb != null) identity.putUUID("Limb", limb);
+        identity.storeNullable("Source", UUIDUtil.CODEC, source);
+        identity.store("Session", CompoundTag.CODEC, session);
+        identity.store("Assembly", CompoundTag.CODEC, assembly);
+        identity.storeNullable("Owner", UUIDUtil.CODEC, owner);
+        identity.storeNullable("Limb", UUIDUtil.CODEC, limb);
         identity.putString("Kind", kind);
         identity.putBoolean("Severed", severed);
-        tag.put(KEY, identity);
     }
 
-    public void load(CompoundTag tag) {
-        CompoundTag identity = tag.getCompound(KEY);
-        createdAt = identity.contains("CreatedAt") ? identity.getLong("CreatedAt") : -1;
-        expiresAt = identity.contains("ExpiresAt") ? identity.getLong("ExpiresAt") : -1;
-        lifetime = identity.contains("Lifetime") ? identity.getString("Lifetime") : "UNBOUND";
-        source = identity.hasUUID("Source") ? identity.getUUID("Source") : null;
-        session = identity.getCompound("Session").copy();
-        assembly = identity.getCompound("Assembly").copy();
+    public void load(ValueInput input) {
+        ValueInput identity = input.childOrEmpty(KEY);
+        createdAt = identity.getLongOr("CreatedAt", -1);
+        expiresAt = identity.getLongOr("ExpiresAt", -1);
+        lifetime = identity.getStringOr("Lifetime", "UNBOUND");
+        source = identity.read("Source", UUIDUtil.CODEC).orElse(null);
+        session = identity.read("Session", CompoundTag.CODEC).orElseGet(CompoundTag::new);
+        assembly = identity.read("Assembly", CompoundTag.CODEC).orElseGet(CompoundTag::new);
         loadedAt = -1;
-        limb = identity.hasUUID("Limb") ? identity.getUUID("Limb") : null;
-        severed = identity.getBoolean("Severed");
-        owner = !severed && identity.hasUUID("Owner") ? identity.getUUID("Owner") : null;
-        kind = identity.getString("Kind");
-        parent = identity.hasUUID("Parent") ? identity.getUUID("Parent") : null;
+        limb = identity.read("Limb", UUIDUtil.CODEC).orElse(null);
+        severed = identity.getBooleanOr("Severed", false);
+        owner = severed ? null : identity.read("Owner", UUIDUtil.CODEC).orElse(null);
+        kind = identity.getStringOr("Kind", "");
+        parent = identity.read("Parent", UUIDUtil.CODEC).orElse(null);
         // Version 2 player limbs depended directly on the torso. Mob ownership IDs
         // are not necessarily limb IDs, so do not infer a mob hierarchy here.
-        if (identity.getInt("Version") < 3 && owner != null && !owner.equals(limb)
+        if (identity.getIntOr("Version", 0) < 3 && owner != null && !owner.equals(limb)
                 && session.contains("startTick")) parent = owner;
-        orphanDeadline = identity.contains("OrphanDeadline") ? identity.getLong("OrphanDeadline") : -1;
+        orphanDeadline = identity.getLongOr("OrphanDeadline", -1);
         resetReferences();
     }
 }

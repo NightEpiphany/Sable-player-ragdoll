@@ -1,11 +1,12 @@
 package com.moigferdsrte.ragdoll.entity;
 
-import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMultimap;
 import com.mojang.authlib.GameProfile;
 import com.mojang.authlib.properties.Property;
+import com.mojang.authlib.properties.PropertyMap;
 import java.util.Optional;
 import java.util.UUID;
-import net.minecraft.nbt.CompoundTag;
+import net.minecraft.core.UUIDUtil;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -18,11 +19,11 @@ import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 
 public final class RagdollDollEntity extends LivingEntity {
-   private static final EntityDataAccessor<Optional<UUID>> DATA_SKIN_UUID = SynchedEntityData.defineId(
-      RagdollDollEntity.class, EntityDataSerializers.OPTIONAL_UUID
-   );
+   private static final EntityDataAccessor<String> DATA_SKIN_UUID = SynchedEntityData.defineId(RagdollDollEntity.class, EntityDataSerializers.STRING);
    private static final EntityDataAccessor<String> DATA_SKIN_NAME = SynchedEntityData.defineId(RagdollDollEntity.class, EntityDataSerializers.STRING);
    private static final EntityDataAccessor<String> DATA_SKIN_TEXTURES = SynchedEntityData.defineId(RagdollDollEntity.class, EntityDataSerializers.STRING);
    private static final EntityDataAccessor<String> DATA_SKIN_TEXTURES_SIGNATURE = SynchedEntityData.defineId(
@@ -47,23 +48,35 @@ public final class RagdollDollEntity extends LivingEntity {
    }
 
    public void setSkinProfile(GameProfile profile) {
-      this.entityData.set(DATA_SKIN_UUID, Optional.ofNullable(profile.getId()));
-      this.entityData.set(DATA_SKIN_NAME, profile.getName() == null ? "" : profile.getName());
-      Property textures = profile.getProperties().get("textures").stream().findFirst().orElse(null);
+      this.entityData.set(DATA_SKIN_UUID, profile.id() == null ? "" : profile.id().toString());
+      this.entityData.set(DATA_SKIN_NAME, profile.name() == null ? "" : profile.name());
+      Property textures = profile.properties().get("textures").stream().findFirst().orElse(null);
       this.entityData.set(DATA_SKIN_TEXTURES, textures == null ? "" : textures.value());
       this.entityData.set(DATA_SKIN_TEXTURES_SIGNATURE, textures == null || textures.signature() == null ? "" : textures.signature());
    }
 
    public GameProfile getSkinProfile() {
-      Optional<UUID> uuid = this.entityData.get(DATA_SKIN_UUID);
+      Optional<UUID> uuid = this.getSkinUuid();
       String name = this.entityData.get(DATA_SKIN_NAME);
       String textures = this.entityData.get(DATA_SKIN_TEXTURES);
       String signature = this.entityData.get(DATA_SKIN_TEXTURES_SIGNATURE);
-      GameProfile profile = new GameProfile(uuid.orElse(this.getUUID()), name.isBlank() ? "Player" : name);
-      if (!textures.isBlank()) {
-         profile.getProperties().put("textures", signature.isBlank() ? new Property("textures", textures) : new Property("textures", textures, signature));
+      PropertyMap properties = textures.isBlank()
+            ? PropertyMap.EMPTY
+            : new PropertyMap(ImmutableMultimap.of(
+                  "textures",
+                  signature.isBlank() ? new Property("textures", textures) : new Property("textures", textures, signature)
+            ));
+      return new GameProfile(uuid.orElse(this.getUUID()), name.isBlank() ? "Player" : name, properties);
+   }
+
+   private Optional<UUID> getSkinUuid() {
+      String value = this.entityData.get(DATA_SKIN_UUID);
+      if (value.isBlank()) return Optional.empty();
+      try {
+         return Optional.of(UUID.fromString(value));
+      } catch (IllegalArgumentException ignored) {
+         return Optional.empty();
       }
-      return profile;
    }
 
    public void setBodyPart(BodyPart bodyPart) {
@@ -82,7 +95,7 @@ public final class RagdollDollEntity extends LivingEntity {
    @Override
    protected void defineSynchedData(SynchedEntityData.Builder builder) {
       super.defineSynchedData(builder);
-      builder.define(DATA_SKIN_UUID, Optional.empty());
+      builder.define(DATA_SKIN_UUID, "");
       builder.define(DATA_SKIN_NAME, "");
       builder.define(DATA_SKIN_TEXTURES, "");
       builder.define(DATA_SKIN_TEXTURES_SIGNATURE, "");
@@ -90,33 +103,21 @@ public final class RagdollDollEntity extends LivingEntity {
    }
 
    @Override
-   public void readAdditionalSaveData(CompoundTag tag) {
-      if (tag.hasUUID("SkinUuid")) {
-         this.entityData.set(DATA_SKIN_UUID, Optional.of(tag.getUUID("SkinUuid")));
-      }
-      this.entityData.set(DATA_SKIN_NAME, tag.getString("SkinName"));
-      this.entityData.set(DATA_SKIN_TEXTURES, tag.getString("SkinTextures"));
-      this.entityData.set(DATA_SKIN_TEXTURES_SIGNATURE, tag.getString("SkinTexturesSignature"));
-      this.entityData.set(DATA_BODY_PART, tag.getInt("BodyPart"));
+   public void readAdditionalSaveData(ValueInput input) {
+      this.entityData.set(DATA_SKIN_UUID, input.read("SkinUuid", UUIDUtil.CODEC).map(UUID::toString).orElse(""));
+      this.entityData.set(DATA_SKIN_NAME, input.getStringOr("SkinName", ""));
+      this.entityData.set(DATA_SKIN_TEXTURES, input.getStringOr("SkinTextures", ""));
+      this.entityData.set(DATA_SKIN_TEXTURES_SIGNATURE, input.getStringOr("SkinTexturesSignature", ""));
+      this.entityData.set(DATA_BODY_PART, input.getIntOr("BodyPart", BodyPart.TORSO.id));
    }
 
    @Override
-   public void addAdditionalSaveData(CompoundTag tag) {
-      this.entityData.get(DATA_SKIN_UUID).ifPresent(uuid -> tag.putUUID("SkinUuid", uuid));
-      tag.putString("SkinName", this.entityData.get(DATA_SKIN_NAME));
-      tag.putString("SkinTextures", this.entityData.get(DATA_SKIN_TEXTURES));
-      tag.putString("SkinTexturesSignature", this.entityData.get(DATA_SKIN_TEXTURES_SIGNATURE));
-      tag.putInt("BodyPart", this.entityData.get(DATA_BODY_PART));
-   }
-
-   @Override
-   public Iterable<ItemStack> getArmorSlots() {
-      return ImmutableList.of(
-         this.getItemBySlot(EquipmentSlot.FEET),
-         this.getItemBySlot(EquipmentSlot.LEGS),
-         this.getItemBySlot(EquipmentSlot.CHEST),
-         this.getItemBySlot(EquipmentSlot.HEAD)
-      );
+   public void addAdditionalSaveData(ValueOutput output) {
+      this.getSkinUuid().ifPresent(uuid -> output.store("SkinUuid", UUIDUtil.CODEC, uuid));
+      output.putString("SkinName", this.entityData.get(DATA_SKIN_NAME));
+      output.putString("SkinTextures", this.entityData.get(DATA_SKIN_TEXTURES));
+      output.putString("SkinTexturesSignature", this.entityData.get(DATA_SKIN_TEXTURES_SIGNATURE));
+      output.putInt("BodyPart", this.entityData.get(DATA_BODY_PART));
    }
 
    @Override

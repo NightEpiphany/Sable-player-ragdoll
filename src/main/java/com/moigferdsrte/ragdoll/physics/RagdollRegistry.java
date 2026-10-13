@@ -24,6 +24,7 @@ import dev.ryanhcode.sable.sublevel.system.SubLevelPhysicsSystem;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
@@ -78,7 +79,7 @@ public final class RagdollRegistry {
       if (isLaunchSuppressed(level, playerId, gameTime)) {
          if (RagdollSettings.debugLogging()) {
             SablePlayerRagdoll.LOGGER.info("[sable_player_ragdoll] launch ignored for {} (already ragdolled or launch already in flight)",
-               player.getGameProfile().getName());
+               player.getGameProfile().name());
          }
          return null;
       }
@@ -184,7 +185,7 @@ public final class RagdollRegistry {
          RagdollExpireHelper.unseatPlayerSilently(level, playerId);
          ServerPlayer player = level.getServer().getPlayerList().getPlayer(playerId);
          if (player != null && releasePosition != null) {
-            player.teleportTo(level, releasePosition.x, releasePosition.y, releasePosition.z, player.getYRot(), player.getXRot());
+            player.teleportTo(level, releasePosition.x, releasePosition.y, releasePosition.z, Set.of(), player.getYRot(), player.getXRot(), false);
          }
       });
       return body;
@@ -199,31 +200,31 @@ public final class RagdollRegistry {
       if (!RagdollSettings.enabled()) return false;
       if (!RagdollSettings.allowManualTrigger()) {
          if (RagdollSettings.debugLogging()) {
-            SablePlayerRagdoll.LOGGER.info("[sable_player_ragdoll] manual ragdoll ignored for {} (manual trigger disabled)", player.getGameProfile().getName());
+            SablePlayerRagdoll.LOGGER.info("[sable_player_ragdoll] manual ragdoll ignored for {} (manual trigger disabled)", player.getGameProfile().name());
          }
          return false;
       }
-      ServerLevel level = player.serverLevel();
+      ServerLevel level = player.level();
       long gameTime = level.getGameTime();
       if (!canTarget(player, gameTime, true)) {
-         SablePlayerRagdoll.LOGGER.info("[sable_player_ragdoll] manual ragdoll ignored for {} (not a valid target)", player.getGameProfile().getName());
+         SablePlayerRagdoll.LOGGER.info("[sable_player_ragdoll] manual ragdoll ignored for {} (not a valid target)", player.getGameProfile().name());
          return false;
       }
       boolean launched = RagdollKeybindExample.launch(player, initialPose) != null;
       if (launched) {
          SablePlayerRagdoll.LOGGER.info("[sable_player_ragdoll] manual ragdoll triggered for {}",
-            player.getGameProfile().getName());
+            player.getGameProfile().name());
       }
       return launched;
    }
 
    public static boolean triggerWeaponHit(ServerPlayer attacker, ServerPlayer target) {
       if (!RagdollSettings.enabled()) return false;
-      ServerLevel level = target.serverLevel();
+      ServerLevel level = target.level();
       long gameTime = level.getGameTime();
       if (!canTarget(target, gameTime, true)) {
          if (RagdollSettings.debugLogging()) {
-            SablePlayerRagdoll.LOGGER.info("[sable_player_ragdoll] weapon ragdoll ignored for {} (not a valid target)", target.getGameProfile().getName());
+            SablePlayerRagdoll.LOGGER.info("[sable_player_ragdoll] weapon ragdoll ignored for {} (not a valid target)", target.getGameProfile().name());
          }
          return false;
       }
@@ -237,7 +238,7 @@ public final class RagdollRegistry {
       ServerSubLevel body = launch(level, target, linear, angular, false, RagdollSettings.autoSeatOnTrigger());
       if (body != null && RagdollSettings.debugLogging()) {
          SablePlayerRagdoll.LOGGER.info("[sable_player_ragdoll] weapon ragdoll {} for {} by {} launch={} m/s",
-            shortId(body.getUniqueId()), target.getGameProfile().getName(), attacker.getGameProfile().getName(), fmtVec3dc(linear));
+            shortId(body.getUniqueId()), target.getGameProfile().name(), attacker.getGameProfile().name(), fmtVec3dc(linear));
       }
       return body != null;
    }
@@ -260,7 +261,7 @@ public final class RagdollRegistry {
       var identity = owned.ragdollIdentity();
       long now = level.getGameTime();
       if (now < identity.nextJointCheck) return;
-      identity.nextJointCheck = now + 10 + level.random.nextInt(11);
+      identity.nextJointCheck = now + 10 + level.getRandom().nextInt(11);
       if (rootSubLevel.isRemoved() || RagdollSessionManager.isExpiring(rootSubLevel)) return;
       Map<BodyPart, UUID> assemblyParts = RagdollAssemblyData.parts(level, rootId);
       if (assemblyParts.isEmpty()) return;
@@ -459,7 +460,7 @@ public final class RagdollRegistry {
       RagdollAssemblyHelper.Doll doll = RagdollAssemblyHelper.spawn(level, player, baseCenter, right, up, forward, false, limbs);
       if (doll == null) return null;
       SablePlayerRagdoll.LOGGER.info("[sable_player_ragdoll] assembled ragdoll {} for {} ({} parts, {} constraints)",
-         shortId(doll.rootSubLevel().getUniqueId()), player.getGameProfile().getName(), doll.allSubLevels().size(), doll.constraints());
+         shortId(doll.rootSubLevel().getUniqueId()), player.getGameProfile().name(), doll.allSubLevels().size(), doll.constraints());
       return doll.rootSubLevel();
    }
 
@@ -482,7 +483,7 @@ public final class RagdollRegistry {
       RagdollAssemblyHelper.Doll doll = RagdollAssemblyHelper.spawn(level, player, baseCenter, right, up, forward, true, limbs);
       if (doll == null) return null;
       SablePlayerRagdoll.LOGGER.info("[sable_player_ragdoll] assembled elytra ragdoll {} for {} ({} parts, {} constraints)",
-         shortId(doll.rootSubLevel().getUniqueId()), player.getGameProfile().getName(), doll.allSubLevels().size(), doll.constraints());
+         shortId(doll.rootSubLevel().getUniqueId()), player.getGameProfile().name(), doll.allSubLevels().size(), doll.constraints());
       return doll.rootSubLevel();
    }
 
@@ -503,7 +504,7 @@ public final class RagdollRegistry {
       String reject = canTargetReject(player, gameTime, manualTrigger);
       if (reject != null) {
          if (RagdollSettings.debugLogging()) {
-            SablePlayerRagdoll.LOGGER.info("[sable_player_ragdoll] canTarget({}) rejected: {}", player.getGameProfile().getName(), reject);
+            SablePlayerRagdoll.LOGGER.info("[sable_player_ragdoll] canTarget({}) rejected: {}", player.getGameProfile().name(), reject);
          }
          return false;
       }
@@ -516,7 +517,7 @@ public final class RagdollRegistry {
       if (player.isSpectator()) return "isSpectator";
       if (!manualTrigger && player.isFallFlying()) return "isFallFlying";
       if (!manualTrigger && player.isCreative() && !RagdollSettings.affectCreative()) return "creative+!affectCreative";
-      var existing = RagdollSessionManager.activeRagdollForPlayer(player.serverLevel(), player.getUUID());
+      var existing = RagdollSessionManager.activeRagdollForPlayer(player.level(), player.getUUID());
       if (existing != null) {
          return "activeRagdollForPlayer!=null (subLevel=" + existing.getUniqueId()
             + ", storedPlayerId=" + RagdollSessionManager.getPlayerId(existing) + ")";

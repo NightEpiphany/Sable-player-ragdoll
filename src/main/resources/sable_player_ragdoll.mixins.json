@@ -1,7 +1,7 @@
 {
   "required": true,
   "package": "com.moigferdsrte.ragdoll.mixin",
-  "compatibilityLevel": "JAVA_21",
+	"compatibilityLevel": "JAVA_25",
   "mixins": [
     "FabricEntityDataMixin",
     "RagdollCrashReportMixin",
@@ -12,8 +12,7 @@
     "LivingEntityRagdollDamageMixin",
     "ActiveSableCompanionBodyGuardMixin",
     "ProjectileRagdollMixin",
-    "ExplosionRagdollMixin",
-    "SubLevelRemovalIterationMixin"
+    "ExplosionRagdollMixin"
   ],
   "client": [
     "client.GuiOverlayRagdollMixin",

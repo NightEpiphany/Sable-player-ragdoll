@@ -32,28 +32,28 @@ public final class DeletingStick {
    // Left-click: delete the whole ragdoll (any attached part), or just the limb if it has been severed.
    public static void delete(ServerLevel level, UUID clickedSubLevelId, ServerPlayer player) {
       boolean removed = RagdollAPI.remove(level, clickedSubLevelId, true);
-      player.displayClientMessage(Component.literal(
-         removed ? "Deleted ragdoll " + RagdollRegistry.shortId(clickedSubLevelId) : "Nothing to delete here"), true);
+      player.sendOverlayMessage(Component.literal(
+         removed ? "Deleted ragdoll " + RagdollRegistry.shortId(clickedSubLevelId) : "Nothing to delete here"));
    }
 
    // Right-click: sever the clicked limb. It stays in the world as a free body until deleted.
    public static void dismember(ServerLevel level, UUID clickedSubLevelId, ServerPlayer player) {
       UUID limbId = RagdollAPI.dismember(level, clickedSubLevelId);
-      player.displayClientMessage(Component.literal(
-         limbId != null ? "Dismembered limb " + RagdollRegistry.shortId(limbId) : "Can't dismember that part"), true);
+      player.sendOverlayMessage(Component.literal(
+         limbId != null ? "Dismembered limb " + RagdollRegistry.shortId(limbId) : "Can't dismember that part"));
    }
 
    // Same as delete/dismember, for mob ragdolls (a separate sub-level system from player ragdolls).
    public static void deleteMob(ServerLevel level, UUID clickedSubLevelId, ServerPlayer player) {
       boolean removed = RagdollAPI.removeMobRagdoll(level, clickedSubLevelId, true);
-      player.displayClientMessage(Component.literal(
-         removed ? "Deleted mob ragdoll " + RagdollRegistry.shortId(clickedSubLevelId) : "Nothing to delete here"), true);
+      player.sendOverlayMessage(Component.literal(
+         removed ? "Deleted mob ragdoll " + RagdollRegistry.shortId(clickedSubLevelId) : "Nothing to delete here"));
    }
 
    public static void dismemberMob(ServerLevel level, UUID clickedSubLevelId, ServerPlayer player) {
       UUID limbId = RagdollAPI.dismemberMob(level, clickedSubLevelId);
-      player.displayClientMessage(Component.literal(
-         limbId != null ? "Dismembered mob limb " + RagdollRegistry.shortId(limbId) : "Can't dismember that part"), true);
+      player.sendOverlayMessage(Component.literal(
+         limbId != null ? "Dismembered mob limb " + RagdollRegistry.shortId(limbId) : "Can't dismember that part"));
    }
 
    private static CompoundTag marker() {

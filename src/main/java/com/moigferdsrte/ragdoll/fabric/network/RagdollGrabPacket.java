@@ -11,14 +11,14 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import com.moigferdsrte.ragdoll.fabric.network.FabricPayloadContext;
 
 public record RagdollGrabPacket(BlockPos pos, boolean release) implements CustomPacketPayload {
    public static final Type<RagdollGrabPacket> TYPE = new Type<>(
-      ResourceLocation.fromNamespaceAndPath("sable_player_ragdoll", "grab")
+      Identifier.fromNamespaceAndPath("sable_player_ragdoll", "grab")
    );
    public static final StreamCodec<RegistryFriendlyByteBuf, RagdollGrabPacket> STREAM_CODEC = StreamCodec.composite(
       BlockPos.STREAM_CODEC, RagdollGrabPacket::pos,
@@ -41,8 +41,8 @@ public record RagdollGrabPacket(BlockPos pos, boolean release) implements Custom
                RagdollGrabCallbacks.notifyReleased(player);
             } else {
                if (!RagdollSettings.grabEnabled()) return;
-               if (RagdollSessionManager.activeRagdollForPlayer(player.serverLevel(), player.getUUID()) != null) return;
-               if (RagdollRegistry.isGrabDisabledAt(player.serverLevel(), packet.pos())) return;
+               if (RagdollSessionManager.activeRagdollForPlayer(player.level(), player.getUUID()) != null) return;
+               if (RagdollRegistry.isGrabDisabledAt(player.level(), packet.pos())) return;
                ragdollPart.startGrab(player.getUUID());
                RagdollGrabCallbacks.notifyGrabbed(player);
             }
@@ -52,8 +52,8 @@ public record RagdollGrabPacket(BlockPos pos, boolean release) implements Custom
                RagdollGrabCallbacks.notifyReleased(player);
             } else {
                if (!RagdollSettings.grabEnabled()) return;
-               if (RagdollSessionManager.activeRagdollForPlayer(player.serverLevel(), player.getUUID()) != null) return;
-               if (RagdollRegistry.isGrabDisabledAt(player.serverLevel(), packet.pos())) return;
+               if (RagdollSessionManager.activeRagdollForPlayer(player.level(), player.getUUID()) != null) return;
+               if (RagdollRegistry.isGrabDisabledAt(player.level(), packet.pos())) return;
                mobRagdollPart.startGrab(player.getUUID());
                RagdollGrabCallbacks.notifyGrabbed(player);
             }

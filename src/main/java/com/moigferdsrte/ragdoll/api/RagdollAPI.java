@@ -69,7 +69,7 @@ public final class RagdollAPI {
 
    @Nullable
    static RagdollSession finishLaunch(ServerPlayer player, RagdollLaunchOptions resolvedOptions, Vector3d linear, Vector3d angular, RagdollPoseSnapshot pose) {
-      ServerLevel level = player.serverLevel();
+      ServerLevel level = player.level();
       ServerSubLevel body = RagdollRegistry.launch(
          level,
          player,
@@ -148,7 +148,7 @@ public final class RagdollAPI {
 
    @Nullable
    public static PlayerlessRagdollSession detachActive(ServerPlayer player, PlayerlessDespawnRule rule) {
-      ServerLevel level = player.serverLevel();
+      ServerLevel level = player.level();
       PlayerlessDespawnRule resolved = rule != null ? rule : PlayerlessDespawnRule.never();
       ServerSubLevel body = RagdollRegistry.detachActiveToPlayerless(level, player.getUUID(), resolved);
       if (body == null) return null;
@@ -175,13 +175,13 @@ public final class RagdollAPI {
 
    @Nullable
    public static RagdollSession activeSession(ServerPlayer player) {
-      ServerSubLevel body = RagdollSessionManager.activeRagdollForPlayer(player.serverLevel(), player.getUUID());
+      ServerSubLevel body = RagdollSessionManager.activeRagdollForPlayer(player.level(), player.getUUID());
       if (body == null) return null;
-      return new ActiveRagdollSession(player, body, -1L, List.of(), RagdollBlockOwnership.ownerForPlayer(player.serverLevel(), player.getUUID()));
+      return new ActiveRagdollSession(player, body, -1L, List.of(), RagdollBlockOwnership.ownerForPlayer(player.level(), player.getUUID()));
    }
 
    public static boolean isRagdolled(ServerPlayer player) {
-      return RagdollSessionManager.activeRagdollForPlayer(player.serverLevel(), player.getUUID()) != null;
+      return RagdollSessionManager.activeRagdollForPlayer(player.level(), player.getUUID()) != null;
    }
 
    public static boolean isRagdollSubLevel(SubLevel subLevel) {
@@ -295,7 +295,7 @@ public final class RagdollAPI {
 
       @Override
       public Vec3 currentVelocity() {
-         SubLevelPhysicsSystem sys = SubLevelPhysicsSystem.get(player.serverLevel());
+         SubLevelPhysicsSystem sys = SubLevelPhysicsSystem.get(player.level());
          if (sys == null) return Vec3.ZERO;
          var handle = sys.getPhysicsHandle(subLevel);
          if (handle == null || !handle.isValid()) return Vec3.ZERO;
@@ -306,12 +306,12 @@ public final class RagdollAPI {
       @Override
       public long elapsedTicks() {
          if (startGameTime < 0) return -1;
-         return player.serverLevel().getGameTime() - startGameTime;
+         return player.level().getGameTime() - startGameTime;
       }
 
       @Override
       public boolean isDismountLocked() {
-         return !RagdollSessionManager.canManualDismount(player.serverLevel(), subLevel);
+         return !RagdollSessionManager.canManualDismount(player.level(), subLevel);
       }
 
       @Override
@@ -322,7 +322,7 @@ public final class RagdollAPI {
       @Override
       public void applyWailing(RagdollWailingOptions options) {
          RagdollWailingOptions resolved = options == null ? RagdollWailingOptions.defaults() : options;
-         RagdollMotorEffects.applyWailing(player.serverLevel(), subLevel, resolved.stiffness(), resolved.durationTicks(), resolved.intervalTicks(), resolved.startDelayTicks());
+         RagdollMotorEffects.applyWailing(player.level(), subLevel, resolved.stiffness(), resolved.durationTicks(), resolved.intervalTicks(), resolved.startDelayTicks());
       }
 
       @Override
@@ -332,7 +332,7 @@ public final class RagdollAPI {
 
       @Override
       public void release() {
-         ServerLevel level = player.serverLevel();
+         ServerLevel level = player.level();
          var root = RagdollBlockOwnership.root(level, owner);
          if (root != null) {
             RagdollBlockOwnership.withOwner(owner, () ->

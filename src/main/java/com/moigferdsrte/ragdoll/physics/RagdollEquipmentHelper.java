@@ -16,16 +16,9 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-import net.fabricmc.loader.api.FabricLoader;
 
 final class RagdollEquipmentHelper {
    private RagdollEquipmentHelper() {
-   }
-
-   static void applyExtraEquipment(RagdollPartBlockEntity part, Player player) {
-      if (FabricLoader.getInstance().isModLoaded("accessories")) {
-         RagdollAccessoriesEquipmentHelper.applyToPart(part, player);
-      }
    }
 
    static void applyFrom(ServerLevel level, UUID rootId, Player player) {
@@ -42,6 +35,7 @@ final class RagdollEquipmentHelper {
       Map<String, List<ItemStack>> curioItems = Map.of();
       Map<String, List<ItemStack>> curioCosmeticItems = Map.of();
       Map<String, List<Boolean>> curioRenderOptions = Map.of();
+      // Accessories integration is disabled on 26.3 until a compatible API is available.
       Map<String, List<ItemStack>> accessoriesItems = Map.of();
       Map<String, List<ItemStack>> accessoriesCosmeticItems = Map.of();
       Map<String, List<Boolean>> accessoriesRenderOptions = Map.of();
@@ -52,15 +46,6 @@ final class RagdollEquipmentHelper {
             vanilla.put(slot, player.getItemBySlot(slot).copy());
          }
          vanillaItems = vanilla;
-      }
-
-      if (resolved == RagdollEquipmentScope.ALL || resolved == RagdollEquipmentScope.OPTIONAL_MODS) {
-         if (FabricLoader.getInstance().isModLoaded("accessories")) {
-            RagdollAccessoriesEquipmentHelper.AccessorySnapshot accessories = RagdollAccessoriesEquipmentHelper.captureSnapshot(player);
-            accessoriesItems = accessories.items();
-            accessoriesCosmeticItems = accessories.cosmeticItems();
-            accessoriesRenderOptions = accessories.renderOptions();
-         }
       }
 
       return new RagdollEquipmentSnapshot(vanillaItems, curioItems, curioCosmeticItems, curioRenderOptions, accessoriesItems, accessoriesCosmeticItems, accessoriesRenderOptions);
@@ -78,12 +63,6 @@ final class RagdollEquipmentHelper {
          snapshot.accessoriesCosmeticItems().forEach(be::setAccessoriesCosmeticItems);
          snapshot.accessoriesRenderOptions().forEach(be::setAccessoriesRenderOptions);
       });
-      sendPartUpdates(level, rootId);
-   }
-
-   static void syncAccessoriesAndSend(ServerLevel level, UUID rootId, Player player) {
-      if (!FabricLoader.getInstance().isModLoaded("accessories")) return;
-      RagdollAccessoriesEquipmentHelper.applyFrom(level, rootId, player);
       sendPartUpdates(level, rootId);
    }
 

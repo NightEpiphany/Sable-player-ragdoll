@@ -6,6 +6,7 @@ import com.moigferdsrte.ragdoll.config.RagdollSettings;
 import com.moigferdsrte.ragdoll.entity.RagdollSeatEntity;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.UUIDUtil;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
@@ -26,8 +27,8 @@ public final class RagdollSeatingHelper {
                targetName(entity), RagdollRegistry.shortId(ragdollSubLevel.getUniqueId()), plotSeatPos.toShortString()
             );
          } else {
-            com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(entity.getVehicle()).putUUID(RagdollBlockLifetime.SOURCE_SESSION,
-                  RagdollBlockOwnership.sessionId(ragdollSubLevel));
+            com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(entity.getVehicle()).store(RagdollBlockLifetime.SOURCE_SESSION,
+                  UUIDUtil.CODEC, RagdollBlockOwnership.sessionId(ragdollSubLevel));
             if (entity instanceof ServerPlayer player) {
                seat.hideRider(player);
             }
@@ -66,7 +67,7 @@ public final class RagdollSeatingHelper {
 
    private static String targetName(LivingEntity entity) {
       if (entity instanceof ServerPlayer player) {
-         return player.getGameProfile().getName();
+         return player.getGameProfile().name();
       }
       return entity.getType().getDescriptionId() + "#" + RagdollRegistry.shortId(entity.getUUID());
    }

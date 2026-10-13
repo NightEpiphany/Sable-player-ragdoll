@@ -4,7 +4,7 @@ import com.moigferdsrte.ragdoll.entity.RagdollSeatEntity;
 import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.ItemInteractionResult;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
@@ -34,20 +34,14 @@ public final class RagdollSeatBlock extends Block {
       super(properties);
    }
 
-   public void fallOn(Level level, BlockState state, BlockPos pos, Entity entity, float fallDistance) {
-      super.fallOn(level, state, pos, entity, fallDistance * 0.5F);
+   @Override
+   public void fallOn(Level level, BlockState state, BlockPos pos, Entity entity, double fallDistance) {
+      super.fallOn(level, state, pos, entity, fallDistance * 0.5);
    }
 
-   public void updateEntityAfterFallOn(BlockGetter reader, Entity entity) {
-      if (entity.isSuppressingBounce()) {
-         super.updateEntityAfterFallOn(reader, entity);
-      } else {
-         Vec3 motion = entity.getDeltaMovement();
-         if (motion.y < 0.0) {
-            double bounceScale = entity instanceof LivingEntity ? 1.0 : 0.8;
-            entity.setDeltaMovement(motion.x, -motion.y * 0.66F * bounceScale, motion.z);
-         }
-      }
+   @Override
+   public float getBounceRestitution() {
+      return 0.66F;
    }
 
    public PathType getBlockPathType(BlockState state, BlockGetter world, BlockPos pos, @Nullable Mob entity) {
@@ -66,7 +60,7 @@ public final class RagdollSeatBlock extends Block {
       return RIDER_COLLISION;
    }
 
-   protected ItemInteractionResult useItemOn(
+   protected InteractionResult useItemOn(
       ItemStack stack, BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hitResult
    ) {
       if (!player.isShiftKeyDown() && !(player instanceof FakePlayer)) {
@@ -75,23 +69,23 @@ public final class RagdollSeatBlock extends Block {
             RagdollSeatEntity seatEntity = seats.getFirst();
             List<Entity> passengers = seatEntity.getPassengers();
             if (!passengers.isEmpty() && passengers.getFirst() instanceof Player) {
-               return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
+               return InteractionResult.PASS;
             } else {
-               if (!level.isClientSide) {
+               if (!level.isClientSide()) {
                   seatEntity.ejectPassengers();
                   player.startRiding(seatEntity);
                }
 
-               return ItemInteractionResult.SUCCESS;
+               return InteractionResult.SUCCESS;
             }
-         } else if (level.isClientSide) {
-            return ItemInteractionResult.SUCCESS;
+         } else if (level.isClientSide()) {
+            return InteractionResult.SUCCESS;
          } else {
             sitDown(level, pos, player);
-            return ItemInteractionResult.SUCCESS;
+            return InteractionResult.SUCCESS;
          }
       } else {
-         return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
+         return InteractionResult.PASS;
       }
    }
 
@@ -100,11 +94,11 @@ public final class RagdollSeatBlock extends Block {
    }
 
    public static void sitDown(Level level, BlockPos pos, Entity entity) {
-      if (!level.isClientSide) {
+      if (!level.isClientSide()) {
          RagdollSeatEntity seat = new RagdollSeatEntity(level);
          seat.setPlotAnchor(pos);
          level.addFreshEntity(seat);
-         entity.startRiding(seat, true);
+         entity.startRiding(seat, true, true);
          if (entity instanceof TamableAnimal tamable) {
             tamable.setInSittingPose(true);
          }

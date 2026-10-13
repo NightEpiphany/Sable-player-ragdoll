@@ -6,7 +6,7 @@ import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import com.moigferdsrte.ragdoll.fabric.network.FabricPayloadContext;
 
@@ -18,7 +18,7 @@ public record RagdollArmInputPacket(boolean leftReach, boolean rightReach, boole
    private static final int RIGHT_GRAB = 1 << 3;
 
    public static final Type<RagdollArmInputPacket> TYPE = new Type<>(
-      ResourceLocation.fromNamespaceAndPath("sable_player_ragdoll", "ragdoll_arm_input")
+      Identifier.fromNamespaceAndPath("sable_player_ragdoll", "ragdoll_arm_input")
    );
    public static final StreamCodec<RegistryFriendlyByteBuf, RagdollArmInputPacket> STREAM_CODEC = StreamCodec.composite(
       ByteBufCodecs.BYTE, RagdollArmInputPacket::flags,

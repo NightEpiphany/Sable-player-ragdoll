@@ -18,6 +18,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.core.UUIDUtil;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundSource;
@@ -50,7 +51,7 @@ public final class RagdollSessionManager {
 
    public static boolean isMarkedRagdoll(ServerSubLevel subLevel) {
       CompoundTag tag = RagdollBlockOwnership.session(subLevel);
-      return tag != null && tag.getBoolean(RAGDOLL_USER_TAG);
+      return tag != null && tag.getBooleanOr(RAGDOLL_USER_TAG, false);
    }
 
    public static void registerRagdoll(ServerSubLevel subLevel, long startTick, @Nullable UUID playerId, boolean nonPlayer) {
@@ -62,7 +63,7 @@ public final class RagdollSessionManager {
       tag.putBoolean(RAGDOLL_USER_TAG, true);
       tag.putLong(START_TICK_KEY, startTick);
       if (playerId != null) {
-         tag.putUUID(PLAYER_ID_KEY, playerId);
+         tag.store(PLAYER_ID_KEY, UUIDUtil.CODEC, playerId);
       } else {
          tag.remove(PLAYER_ID_KEY);
       }
@@ -86,7 +87,6 @@ public final class RagdollSessionManager {
       LAST_VELOCITIES.remove(RagdollBlockOwnership.sessionId(subLevel));
       NEXT_IMPACT_DAMAGE_TICKS.remove(RagdollBlockOwnership.sessionId(subLevel));
       RagdollMotorEffects.clear(RagdollBlockOwnership.sessionId(subLevel));
-      RagdollAccessoriesLiveSync.clear(RagdollBlockOwnership.sessionId(subLevel));
    }
 
    public static void setCustomDespawnConditions(ServerSubLevel subLevel, List<DespawnCondition> conditions) {
@@ -131,8 +131,8 @@ public final class RagdollSessionManager {
       var entity = level.getEntity(playerId);
       if (entity == null || entity.getVehicle() == null) return null;
       var tag = com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(entity.getVehicle());
-      if (!tag.hasUUID(RagdollBlockLifetime.SOURCE_SESSION)) return null;
-      UUID owner = tag.getUUID(RagdollBlockLifetime.SOURCE_SESSION);
+      UUID owner = tag.read(RagdollBlockLifetime.SOURCE_SESSION, UUIDUtil.CODEC).orElse(null);
+      if (owner == null) return null;
       var root = sourceRoot(entity.getVehicle(), level, owner);
       if (root == null) return null;
       for (var be : RagdollBlockOwnership.blocks(root)) {
@@ -158,7 +158,7 @@ public final class RagdollSessionManager {
 
    static boolean isGrabDisabled(ServerSubLevel subLevel) {
       CompoundTag tag = RagdollBlockOwnership.session(subLevel);
-      return tag != null && tag.getBoolean(GRAB_DISABLED_KEY);
+      return tag != null && tag.getBooleanOr(GRAB_DISABLED_KEY, false);
    }
 
    public static void setDismountLocked(ServerSubLevel subLevel, boolean locked) {
@@ -173,7 +173,7 @@ public final class RagdollSessionManager {
       if (DISMOUNT_LOCKED.contains(RagdollBlockOwnership.sessionId(subLevel))) return false;
       CompoundTag tag = RagdollBlockOwnership.session(subLevel);
       if (tag == null) return false;
-      long elapsed = level.getGameTime() - tag.getLong(START_TICK_KEY);
+      long elapsed = level.getGameTime() - tag.getLongOr(START_TICK_KEY, 0L);
       if (elapsed < (long) RagdollSettings.minDismountTicks()) return false;
       return !RagdollSettings.expireAfterDuration()
             || elapsed >= (long) scaledRagdollDurationTicks(tag);
@@ -189,16 +189,7 @@ public final class RagdollSessionManager {
       } else {
          RagdollMotorEffects.tick(level, root);
          applyImpactDamage(level, physics, serverContainer, root);
-         pollAccessories(level, root);
       }
-   }
-
-   private static void pollAccessories(ServerLevel level, ServerSubLevel head) {
-      UUID playerId = getPlayerId(head);
-      if (playerId == null) return;
-      ServerPlayer player = level.getServer().getPlayerList().getPlayer(playerId);
-      if (player == null) return;
-      RagdollAccessoriesLiveSync.poll(level, head.getUniqueId(), player);
    }
 
    static boolean shouldExpire(ServerLevel level, SubLevelPhysicsSystem physicsSystem, ServerSubLevel subLevel) {
@@ -209,7 +200,7 @@ public final class RagdollSessionManager {
       if (tag == null) {
          return false;
       }
-      long elapsed = level.getGameTime() - tag.getLong(START_TICK_KEY);
+      long elapsed = level.getGameTime() - tag.getLongOr(START_TICK_KEY, 0L);
       List<DespawnCondition> customConditions = CUSTOM_DESPAWN_CONDITIONS.get(RagdollBlockOwnership.sessionId(subLevel));
       if (customConditions != null) {
          return customConditionsShouldExpire(level, physicsSystem, subLevel, elapsed, customConditions);
@@ -252,14 +243,14 @@ public final class RagdollSessionManager {
    }
 
    private static @Nullable Boolean customPlayerlessExpiration(CompoundTag tag, long elapsed, SubLevelPhysicsSystem physicsSystem, ServerSubLevel subLevel) {
-      if (!tag.getBoolean(NON_PLAYER_KEY)) return null;
+      if (!tag.getBooleanOr(NON_PLAYER_KEY, false)) return null;
       if (!tag.contains(DESPAWN_MODE_KEY)) return false;
 
-      PlayerlessDespawnRule.Mode mode = despawnMode(tag.getString(DESPAWN_MODE_KEY));
+      PlayerlessDespawnRule.Mode mode = despawnMode(tag.getStringOr(DESPAWN_MODE_KEY, ""));
       return switch (mode) {
          case DEFAULT, NEVER -> false;
-         case AFTER_TICKS -> elapsed >= (long) tag.getInt(DESPAWN_TICKS_KEY);
-         case BELOW_SPEED -> sampleSpeedMetersPerSecond(physicsSystem, subLevel) <= tag.getDouble(DESPAWN_SPEED_KEY);
+         case AFTER_TICKS -> elapsed >= (long) tag.getIntOr(DESPAWN_TICKS_KEY, 0);
+         case BELOW_SPEED -> sampleSpeedMetersPerSecond(physicsSystem, subLevel) <= tag.getDoubleOr(DESPAWN_SPEED_KEY, 0.0);
       };
    }
 
@@ -276,7 +267,7 @@ public final class RagdollSessionManager {
       if (tag == null) {
          return "expired";
       }
-      long elapsed = level.getGameTime() - tag.getLong(START_TICK_KEY);
+      long elapsed = level.getGameTime() - tag.getLongOr(START_TICK_KEY, 0L);
       if (RagdollSettings.expireAfterSafetyTimeout() && elapsed >= (long) scaledSafetyLifetimeTicks(tag)) {
          return "safety timeout";
       }
@@ -296,7 +287,7 @@ public final class RagdollSessionManager {
    }
 
    private static int durationScale(CompoundTag tag) {
-      return tag.getBoolean(NON_PLAYER_KEY) ? NON_PLAYER_DURATION_SCALE : 1;
+      return tag.getBooleanOr(NON_PLAYER_KEY, false) ? NON_PLAYER_DURATION_SCALE : 1;
    }
 
    static void markExpiring(ServerSubLevel subLevel) {
@@ -315,22 +306,22 @@ public final class RagdollSessionManager {
 
    public static boolean isExpiring(ServerSubLevel subLevel) {
       CompoundTag tag = RagdollBlockOwnership.session(subLevel);
-      return tag != null && tag.getBoolean(EXPIRING_KEY);
+      return tag != null && tag.getBooleanOr(EXPIRING_KEY, false);
    }
 
    static @Nullable String getEndReason(ServerSubLevel subLevel) {
       CompoundTag tag = RagdollBlockOwnership.session(subLevel);
-      return tag != null && tag.contains(END_REASON_KEY) ? tag.getString(END_REASON_KEY) : null;
+      return tag == null ? null : tag.getString(END_REASON_KEY).orElse(null);
    }
 
    @Nullable
    public static UUID getPlayerId(ServerSubLevel subLevel) {
       CompoundTag tag = RagdollBlockOwnership.session(subLevel);
-      return tag != null && tag.hasUUID(PLAYER_ID_KEY) ? tag.getUUID(PLAYER_ID_KEY) : null;
+      return tag == null ? null : tag.read(PLAYER_ID_KEY, UUIDUtil.CODEC).orElse(null);
    }
 
    public static boolean isPlayerCurrentlyRagdolled(ServerPlayer player) {
-      ServerSubLevel ragdoll = activeRagdollForPlayer(player.serverLevel(), player.getUUID());
+      ServerSubLevel ragdoll = activeRagdollForPlayer(player.level(), player.getUUID());
       return ragdoll != null;
    }
 
@@ -370,7 +361,7 @@ public final class RagdollSessionManager {
          : RagdollSoundEvents.ragdollSmallImpact();
       if (soundEvent != null) {
          float volume = damageImpact ? 0.25F : 1.7F;
-         float pitch = 0.9F + level.random.nextFloat() * 0.2F;
+         float pitch = 0.9F + level.getRandom().nextFloat() * 0.2F;
          level.playSound(null, position.x, position.y, position.z, soundEvent, SoundSource.PLAYERS, volume, pitch);
       }
 
@@ -445,7 +436,7 @@ public final class RagdollSessionManager {
 
       @Override
       public boolean isDismountLocked() {
-         return !RagdollSessionManager.canManualDismount(player.serverLevel(), subLevel);
+         return !RagdollSessionManager.canManualDismount(player.level(), subLevel);
       }
 
       @Override
@@ -457,7 +448,7 @@ public final class RagdollSessionManager {
       public void applyWailing(com.moigferdsrte.ragdoll.api.RagdollWailingOptions options) {
          com.moigferdsrte.ragdoll.api.RagdollWailingOptions resolved =
             options == null ? com.moigferdsrte.ragdoll.api.RagdollWailingOptions.defaults() : options;
-         RagdollMotorEffects.applyWailing(player.serverLevel(), subLevel, resolved.stiffness(), resolved.durationTicks(), resolved.intervalTicks(), resolved.startDelayTicks());
+         RagdollMotorEffects.applyWailing(player.level(), subLevel, resolved.stiffness(), resolved.durationTicks(), resolved.intervalTicks(), resolved.startDelayTicks());
       }
 
       @Override
@@ -468,7 +459,7 @@ public final class RagdollSessionManager {
       @Override
       public void release() {
          if (!subLevel.isRemoved()) {
-            RagdollExpireHelper.expire(player.serverLevel(), subLevel, "api custom release");
+            RagdollExpireHelper.expire(player.level(), subLevel, "api custom release");
          }
       }
    }

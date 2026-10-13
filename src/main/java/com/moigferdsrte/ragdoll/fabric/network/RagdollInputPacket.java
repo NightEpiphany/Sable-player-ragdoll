@@ -6,13 +6,13 @@ import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import com.moigferdsrte.ragdoll.fabric.network.FabricPayloadContext;
 
 public record RagdollInputPacket(float strafe, float forward) implements CustomPacketPayload {
    public static final Type<RagdollInputPacket> TYPE = new Type<>(
-      ResourceLocation.fromNamespaceAndPath("sable_player_ragdoll", "ragdoll_input")
+      Identifier.fromNamespaceAndPath("sable_player_ragdoll", "ragdoll_input")
    );
    public static final StreamCodec<RegistryFriendlyByteBuf, RagdollInputPacket> STREAM_CODEC = StreamCodec.composite(
       ByteBufCodecs.FLOAT, RagdollInputPacket::strafe,

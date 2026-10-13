@@ -24,11 +24,11 @@ public final class RagdollInputClient {
             sendArms(false, false, false, false, Vec3.ZERO);
             return;
         }
-        float strafe = axis(player.input.right, player.input.left);
-        float forward = axis(player.input.down, player.input.up);
+        float strafe = axis(player.input.keyPresses.right(), player.input.keyPresses.left());
+        float forward = axis(player.input.keyPresses.backward(), player.input.keyPresses.forward());
         sendMovement(strafe, forward, false);
         if (player.getVehicle() instanceof RagdollSeatEntity) {
-            var look = minecraft.gameRenderer.getMainCamera().getLookVector();
+            var look = minecraft.gameRenderer.mainCamera().forwardVector();
             sendArms(minecraft.options.keyAttack.isDown(), minecraft.options.keyUse.isDown(),
                     minecraft.options.keySprint.isDown(), minecraft.options.keyJump.isDown(),
                     new Vec3(look.x(), look.y(), look.z()));

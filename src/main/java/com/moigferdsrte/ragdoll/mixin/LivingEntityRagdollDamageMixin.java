@@ -3,6 +3,7 @@ package com.moigferdsrte.ragdoll.mixin;
 import com.moigferdsrte.ragdoll.mob.MobRagdollAssembly;
 import com.moigferdsrte.ragdoll.mob.client.MobRagdollClientState;
 import com.moigferdsrte.ragdoll.physics.RagdollSessionManager;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageTypes;
@@ -16,14 +17,14 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 
 @Mixin(LivingEntity.class)
 public abstract class LivingEntityRagdollDamageMixin {
-    @WrapMethod(method = "hurt")
-    private boolean sablePlayerRagdoll$suppressRagdollSuffocation(DamageSource source, float amount, Operation<Boolean> original) {
+    @WrapMethod(method = "hurtServer")
+    private boolean sablePlayerRagdoll$suppressRagdollSuffocation(ServerLevel level, DamageSource source, float damage, Operation<Boolean> original) {
         LivingEntity entity = (LivingEntity) (Object) this;
         if (source.is(DamageTypes.IN_WALL) && sablePlayerRagdoll$isHiddenRagdollSource(entity)) {
             return false;
         }
 
-        return original.call(source, amount);
+        return original.call(level, source, damage);
     }
 
     @WrapMethod(method = "travel")

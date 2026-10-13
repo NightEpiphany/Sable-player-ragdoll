@@ -57,14 +57,14 @@ public final class RagdollControlHelper {
    }
 
    public static void updateInput(ServerPlayer player, float strafe, float forward) {
-      INPUTS.put(player.getUUID(), new ControlInput(clampAxis(strafe), clampAxis(forward), player.serverLevel().getGameTime()));
+      INPUTS.put(player.getUUID(), new ControlInput(clampAxis(strafe), clampAxis(forward), player.level().getGameTime()));
    }
 
    public static void updateArmInput(ServerPlayer player, boolean leftReach, boolean rightReach,
                                      boolean leftGrab, boolean rightGrab, float lookX, float lookY, float lookZ) {
       ARM_INPUTS.put(player.getUUID(),
          new ArmInput(leftReach, rightReach, leftGrab, rightGrab, new Vector3d(lookX, lookY, lookZ),
-            player.serverLevel().getGameTime()));
+            player.level().getGameTime()));
    }
 
    public static void clearInput(UUID playerId) {

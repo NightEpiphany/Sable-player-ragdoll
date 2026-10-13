@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.UUIDUtil;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.entity.BlockEntity;
 
@@ -41,7 +42,8 @@ public final class RagdollBlockOwnership {
         var source = level.getEntity(player);
         if (source != null && source.getVehicle() != null) {
             var tag = com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(source.getVehicle());
-            if (tag.hasUUID(RagdollBlockLifetime.SOURCE_SESSION)) return tag.getUUID(RagdollBlockLifetime.SOURCE_SESSION);
+            UUID sessionId = tag.read(RagdollBlockLifetime.SOURCE_SESSION, UUIDUtil.CODEC).orElse(null);
+            if (sessionId != null) return sessionId;
         }
         for (var be : loadedBlocks(level)) {
             var identity = ((RagdollOwnedBlock) be).ragdollIdentity();

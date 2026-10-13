@@ -61,7 +61,7 @@ public final class RagdollRelationships {
         var id = ((RagdollOwnedBlock) be).ragdollIdentity();
         long now = level.getGameTime();
         if (now < id.nextRelationshipCheck) return;
-        id.nextRelationshipCheck = now + 10 + level.random.nextInt(11);
+        id.nextRelationshipCheck = now + 10 + level.getRandom().nextInt(11);
         if (id.owner() == null || id.severed()) return;
         if (id.relatives.isEmpty()) PENDING.add(be);
         if (be instanceof com.moigferdsrte.ragdoll.mob.block.entity.MobRagdollPartBlockEntity) {

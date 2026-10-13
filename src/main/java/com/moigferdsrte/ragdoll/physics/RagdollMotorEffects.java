@@ -31,7 +31,7 @@ public final class RagdollMotorEffects {
    public static void applyWailing(ServerLevel level, ServerSubLevel rootSubLevel, double stiffness, int durationTicks, int intervalTicks, int startDelayTicks) {
       long startTick = level.getGameTime() + Math.max(0, startDelayTicks);
       long endTick = startTick + Math.max(1, durationTicks);
-      long seed = level.random.nextLong();
+      long seed = level.getRandom().nextLong();
       CompoundTag tag = RagdollBlockOwnership.session(rootSubLevel);
       CompoundTag wailing = new CompoundTag();
       wailing.putLong(START_TICK_KEY, startTick);
@@ -50,9 +50,9 @@ public final class RagdollMotorEffects {
          return;
       }
 
-      CompoundTag wailing = tag.getCompound(WAILING_KEY);
+      CompoundTag wailing = tag.getCompoundOrEmpty(WAILING_KEY);
       long gameTime = level.getGameTime();
-      if (gameTime >= wailing.getLong(END_TICK_KEY)) {
+      if (gameTime >= wailing.getLongOr(END_TICK_KEY, 0L)) {
          restoreBaseMotors(RagdollBlockOwnership.sessionId(rootSubLevel));
          tag.remove(WAILING_KEY);
          RagdollBlockOwnership.session(rootSubLevel, tag);
@@ -62,7 +62,7 @@ public final class RagdollMotorEffects {
 
       RuntimeWailing runtime = RUNTIME_WAILING.computeIfAbsent(
          RagdollBlockOwnership.sessionId(rootSubLevel),
-         unused -> new RuntimeWailing(RandomSource.create(wailing.getLong(SEED_KEY)), startTick(wailing, gameTime))
+         unused -> new RuntimeWailing(RandomSource.create(wailing.getLongOr(SEED_KEY, 0L)), startTick(wailing, gameTime))
       );
       if (gameTime >= runtime.nextRetargetTick()) {
          retargetWailing(level, rootSubLevel, wailing, runtime);
@@ -85,7 +85,7 @@ public final class RagdollMotorEffects {
 
    private static void retargetWailing(ServerLevel level, ServerSubLevel rootSubLevel, CompoundTag wailing, RuntimeWailing runtime) {
       Map<BodyPart, RagdollAssemblyHelper.RagdollJoint> joints = RagdollAssemblyHelper.joints(RagdollBlockOwnership.sessionId(rootSubLevel));
-      double stiffness = wailing.getDouble(STIFFNESS_KEY);
+      double stiffness = wailing.getDoubleOr(STIFFNESS_KEY, 0.0);
       for (Map.Entry<BodyPart, RagdollAssemblyHelper.RagdollJoint> entry : joints.entrySet()) {
          if (entry.getKey() == BodyPart.TORSO) {
             continue;
@@ -103,11 +103,11 @@ public final class RagdollMotorEffects {
          handle.setMotor(ConstraintJointAxis.ANGULAR_Z, target.z, stiffness, WAILING_DAMPING, false, 0.0);
       }
 
-      runtime.setNextRetargetTick(level.getGameTime() + Math.max(1, wailing.getInt(INTERVAL_TICKS_KEY)));
+      runtime.setNextRetargetTick(level.getGameTime() + Math.max(1, wailing.getIntOr(INTERVAL_TICKS_KEY, 1)));
    }
 
    private static long startTick(CompoundTag wailing, long fallback) {
-      return wailing.contains(START_TICK_KEY) ? wailing.getLong(START_TICK_KEY) : fallback;
+      return wailing.getLongOr(START_TICK_KEY, fallback);
    }
 
    private static Vector3d randomTarget(BodyPart bodyPart, Vector3dc baseTarget, RandomSource random) {

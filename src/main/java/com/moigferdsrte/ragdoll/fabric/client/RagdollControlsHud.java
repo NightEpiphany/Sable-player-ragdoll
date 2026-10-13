@@ -4,9 +4,9 @@ import java.util.List;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.FastColor;
+import net.minecraft.util.ARGB;
 
 public final class RagdollControlsHud {
    private static final int FADE_IN_TICKS = 10;
@@ -35,7 +35,7 @@ public final class RagdollControlsHud {
       }
    }
 
-   public static void render(GuiGraphics graphics, DeltaTracker deltaTracker) {
+   public static void render(GuiGraphicsExtractor graphics, DeltaTracker deltaTracker) {
       if (ticksRemaining <= 0 || lines.isEmpty()) {
          return;
       }
@@ -53,19 +53,19 @@ public final class RagdollControlsHud {
       if (alpha <= 8) {
          return;
       }
-      int color = FastColor.ARGB32.color(alpha, -1);
+      int color = ARGB.color(alpha, 255, 255, 255);
+      int backdrop = ARGB.color(alpha * 3 / 4, 0, 0, 0);
 
       Font font = Minecraft.getInstance().font;
       int lineHeight = font.lineHeight + 2;
       int count = lines.size();
-      graphics.pose().pushPose();
-      graphics.pose().translate((float) (graphics.guiWidth() / 2), (float) (graphics.guiHeight() - 68), 0.0F);
+      int centerX = graphics.guiWidth() / 2;
       for (int i = 0; i < count; i++) {
          Component line = lines.get(i);
          int width = font.width(line);
-         int y = -4 - (count - 1 - i) * lineHeight;
-         graphics.drawStringWithBackdrop(font, line, -width / 2, y, width, color);
+         int y = graphics.guiHeight() - 68 - (count - 1 - i) * lineHeight;
+         graphics.fill(centerX - width / 2 - 2, y - 1, centerX + width / 2 + 2, y + font.lineHeight + 1, backdrop);
+         graphics.centeredText(font, line, centerX, y, color);
       }
-      graphics.pose().popPose();
    }
 }

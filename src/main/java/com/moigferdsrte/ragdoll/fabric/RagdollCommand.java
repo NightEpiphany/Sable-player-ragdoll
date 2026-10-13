@@ -15,6 +15,7 @@ import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.commands.arguments.coordinates.Vec3Argument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.phys.Vec3;
 
 public final class RagdollCommand {
@@ -26,7 +27,7 @@ public final class RagdollCommand {
 
    public static LiteralArgumentBuilder<CommandSourceStack> build() {
       return Commands.literal("ragdoll")
-         .requires(source -> source.hasPermission(2))
+         .requires(source -> source.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
          .then(Commands.argument("targets", EntityArgument.players())
             .then(Commands.argument("length", IntegerArgumentType.integer(0))
                .then(Commands.argument("strength", DoubleArgumentType.doubleArg(0.0))

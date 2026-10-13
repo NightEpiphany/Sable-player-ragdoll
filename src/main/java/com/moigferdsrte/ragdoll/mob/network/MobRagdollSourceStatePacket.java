@@ -6,13 +6,13 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.Entity;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 public record MobRagdollSourceStatePacket(int entityId, boolean hidden) implements CustomPacketPayload {
     public static final Type<MobRagdollSourceStatePacket> TYPE = new Type<>(
-            ResourceLocation.fromNamespaceAndPath(SablePlayerRagdoll.MOD_ID, "mob_ragdoll_source_state")
+            Identifier.fromNamespaceAndPath(SablePlayerRagdoll.MOD_ID, "mob_ragdoll_source_state")
     );
     public static final StreamCodec<RegistryFriendlyByteBuf, MobRagdollSourceStatePacket> STREAM_CODEC = StreamCodec.of(
             MobRagdollSourceStatePacket::encode,

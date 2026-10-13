@@ -6,6 +6,7 @@ import com.moigferdsrte.ragdoll.mob.MobRagdollAssembly;
 import com.moigferdsrte.ragdoll.mob.block.entity.MobRagdollPartBlockEntity;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
+import net.minecraft.core.UUIDUtil;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
@@ -32,7 +33,7 @@ public final class RagdollBlockLifetime {
         for (var be : RagdollBlockOwnership.loadedBlocks(root.getLevel())) {
             var identity = ((RagdollOwnedBlock) be).ragdollIdentity();
             if (!owner.equals(identity.owner())) continue;
-            if (session.getBoolean("expiring") && !owner.equals(identity.limb())) continue;
+            if (session.getBooleanOr("expiring", false) && !owner.equals(identity.limb())) continue;
             applyPlayerPolicy(be, session);
         }
     }
@@ -40,14 +41,14 @@ public final class RagdollBlockLifetime {
     private static void applyPlayerPolicy(BlockEntity be, CompoundTag session) {
         var identity = ((RagdollOwnedBlock) be).ragdollIdentity();
         identity.session(session);
-        long created = session.getLong("startTick");
-        UUID source = session.hasUUID("playerId") ? session.getUUID("playerId") : null;
+        long created = session.getLongOr("startTick", 0L);
+        UUID source = session.read("playerId", UUIDUtil.CODEC).orElse(null);
         String mode = source != null ? "RIDER" : "TIMED";
         int ticks = (RagdollSettings.expireAfterDuration() ? RagdollSettings.ragdollDurationTicks()
                 : RagdollSettings.step1BodyLifetimeTicks()) * 3;
-        if (session.getBoolean("nonPlayer")) {
-            switch (session.getString("despawnMode")) {
-                case "AFTER_TICKS" -> ticks = session.getInt("despawnTicks");
+        if (session.getBooleanOr("nonPlayer", false)) {
+            switch (session.getStringOr("despawnMode", "")) {
+                case "AFTER_TICKS" -> ticks = session.getIntOr("despawnTicks", 0);
                 case "BELOW_SPEED" -> mode = "SPEED";
                 default -> mode = "PERMANENT";
             }
@@ -94,7 +95,7 @@ public final class RagdollBlockLifetime {
         long age = level.getGameTime() - identity.createdAt();
         // Stagger the independent checks; never depend on physics bodies being awake.
         if (now < identity.nextPolicyCheck) return;
-        identity.nextPolicyCheck = now + 10 + level.random.nextInt(11);
+        identity.nextPolicyCheck = now + 10 + level.getRandom().nextInt(11);
         if (age < CREATION_GRACE_TICKS) return;
         boolean keep = switch (identity.lifetime()) {
             case "PERMANENT" -> true;
@@ -104,7 +105,7 @@ public final class RagdollBlockLifetime {
             case "RECOVERING" -> validMob(level, identity);
             case "SPEED" -> {
                 var root = identity.owner() == null ? part : RagdollBlockOwnership.root(level, identity.owner());
-                yield root != null && speed(root) > identity.session().getDouble("despawnSpeed");
+                yield root != null && speed(root) > identity.session().getDoubleOr("despawnSpeed", 0.0);
             }
             default -> false;
         };
@@ -117,7 +118,7 @@ public final class RagdollBlockLifetime {
             // A root with no identity is malformed, not a permanent orphan.
             keep &= identity.owner() != null;
             if (identity.owner() != null && identity.owner().equals(identity.limb()))
-                keep &= !identity.session().getBoolean("expiring");
+                keep &= !identity.session().getBooleanOr("expiring", false);
             if (root == null && identity.owner() != null) RagdollAssemblyHelper.clearRuntime(identity.owner());
         }
         if (keep) return;
@@ -149,19 +150,21 @@ public final class RagdollBlockLifetime {
         var source = level.getEntity(identity.source());
         if (!(source instanceof LivingEntity living) || !living.isAlive() || !source.isPassenger()) return false;
         var tag = com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(source.getVehicle());
-        if (!tag.hasUUID(SOURCE_SESSION)) {
+        UUID trackedOwner = tag.read(SOURCE_SESSION, UUIDUtil.CODEC).orElse(null);
+        if (trackedOwner == null) {
             var containing = Sable.HELPER.getContaining(level, source.getVehicle().blockPosition());
             if (containing instanceof ServerSubLevel part) {
                 for (var be : RagdollBlockOwnership.blocks(part)) {
                     var candidate = ((RagdollOwnedBlock) be).ragdollIdentity();
                     if (identity.owner().equals(candidate.owner()) && identity.source().equals(candidate.source())) {
-                        tag.putUUID(SOURCE_SESSION, identity.owner());
+                        tag.store(SOURCE_SESSION, UUIDUtil.CODEC, identity.owner());
+                        trackedOwner = identity.owner();
                         break;
                     }
                 }
             }
         }
-        return tag.hasUUID(SOURCE_SESSION) && identity.owner().equals(tag.getUUID(SOURCE_SESSION));
+        return identity.owner().equals(trackedOwner);
     }
 
     private static boolean validMob(ServerLevel level, RagdollBlockIdentity identity) {
@@ -170,7 +173,8 @@ public final class RagdollBlockLifetime {
         // A temporarily unloaded source is permitted only until the block's fixed deadline.
         if (source == null) return true;
         var tag = com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(source);
-        return source.isAlive() && tag.hasUUID(SOURCE_SESSION) && identity.owner().equals(tag.getUUID(SOURCE_SESSION));
+        UUID trackedOwner = tag.read(SOURCE_SESSION, UUIDUtil.CODEC).orElse(null);
+        return source.isAlive() && identity.owner().equals(trackedOwner);
     }
 
     private static double speed(ServerSubLevel part) {

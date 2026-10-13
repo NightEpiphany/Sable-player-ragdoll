@@ -1,11 +1,15 @@
 package com.moigferdsrte.ragdoll.block.entity;
 
+import com.google.common.collect.ImmutableMultimap;
 import com.moigferdsrte.ragdoll.physics.RagdollBlockIdentity;
 import com.moigferdsrte.ragdoll.physics.RagdollBlockOwnership;
 import com.moigferdsrte.ragdoll.physics.RagdollOwnedBlock;
 
 import com.mojang.authlib.GameProfile;
 import com.mojang.authlib.properties.Property;
+import com.mojang.authlib.properties.PropertyMap;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
 import com.moigferdsrte.ragdoll.RagdollGrabCallbacks;
 import com.moigferdsrte.ragdoll.physics.RagdollAssemblyHelper;
 import com.moigferdsrte.ragdoll.physics.RagdollControlHelper;
@@ -29,13 +33,13 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.UUIDUtil;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
@@ -48,10 +52,27 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import org.joml.Quaterniond;
 import org.joml.Vector3d;
 
 public final class RagdollPartBlockEntity extends BlockEntity implements BlockEntitySubLevelActor, RagdollOwnedBlock {
+   private static final Codec<SavedItem> SAVED_ITEM_CODEC = RecordCodecBuilder.create(instance -> instance.group(
+         ItemStack.CODEC.optionalFieldOf("Item").forGetter(SavedItem::item)
+   ).apply(instance, SavedItem::new));
+   private static final Codec<SavedItemSlot> SAVED_ITEM_SLOT_CODEC = RecordCodecBuilder.create(instance -> instance.group(
+         Codec.STRING.optionalFieldOf("SlotId", "").forGetter(SavedItemSlot::slotId),
+         SAVED_ITEM_CODEC.listOf().optionalFieldOf("Stacks", List.of()).forGetter(SavedItemSlot::stacks)
+   ).apply(instance, SavedItemSlot::new));
+   private static final Codec<SavedBoolean> SAVED_BOOLEAN_CODEC = RecordCodecBuilder.create(instance -> instance.group(
+         Codec.BOOL.optionalFieldOf("Render", false).forGetter(SavedBoolean::render)
+   ).apply(instance, SavedBoolean::new));
+   private static final Codec<SavedBooleanSlot> SAVED_BOOLEAN_SLOT_CODEC = RecordCodecBuilder.create(instance -> instance.group(
+         Codec.STRING.optionalFieldOf("SlotId", "").forGetter(SavedBooleanSlot::slotId),
+         SAVED_BOOLEAN_CODEC.listOf().optionalFieldOf("Options", List.of()).forGetter(SavedBooleanSlot::options)
+   ).apply(instance, SavedBooleanSlot::new));
+
     private final RagdollBlockIdentity ragdollIdentity = new RagdollBlockIdentity();
 
     @Override
@@ -104,9 +125,9 @@ public final class RagdollPartBlockEntity extends BlockEntity implements BlockEn
 
    public void configure(BodyPart bodyPart, GameProfile profile) {
       this.bodyPart = bodyPart;
-      this.skinUuid = profile.getId();
-      this.skinName = profile.getName() == null || profile.getName().isBlank() ? "Player" : profile.getName();
-      Property textures = profile.getProperties().get("textures").stream().findFirst().orElse(null);
+      this.skinUuid = profile.id();
+      this.skinName = profile.name() == null || profile.name().isBlank() ? "Player" : profile.name();
+      Property textures = profile.properties().get("textures").stream().findFirst().orElse(null);
       this.skinTextures = textures == null ? "" : textures.value();
       this.skinTexturesSignature = textures == null || textures.signature() == null ? "" : textures.signature();
       this.setChanged();
@@ -232,13 +253,19 @@ public final class RagdollPartBlockEntity extends BlockEntity implements BlockEn
    }
 
    public GameProfile skinProfile() {
-      GameProfile profile = new GameProfile(this.skinUuid != null ? this.skinUuid : UUID.nameUUIDFromBytes(this.skinName.getBytes()), this.skinName);
-      if (!this.skinTextures.isBlank()) {
-         profile.getProperties()
-            .put("textures", this.skinTexturesSignature.isBlank() ? new Property("textures", this.skinTextures) : new Property("textures", this.skinTextures, this.skinTexturesSignature));
-      }
-
-      return profile;
+      PropertyMap properties = this.skinTextures.isBlank()
+            ? PropertyMap.EMPTY
+            : new PropertyMap(ImmutableMultimap.of(
+                  "textures",
+                  this.skinTexturesSignature.isBlank()
+                        ? new Property("textures", this.skinTextures)
+                        : new Property("textures", this.skinTextures, this.skinTexturesSignature)
+            ));
+      return new GameProfile(
+            this.skinUuid != null ? this.skinUuid : UUID.nameUUIDFromBytes(this.skinName.getBytes()),
+            this.skinName,
+            properties
+      );
    }
 
    public void setItemForSlot(EquipmentSlot slot, ItemStack stack) {
@@ -353,56 +380,54 @@ public final class RagdollPartBlockEntity extends BlockEntity implements BlockEn
    }
 
    @Override
-   protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
-      super.saveAdditional(tag, registries);
-        ragdollIdentity.save(tag);
-      tag.putString("BodyPart", this.bodyPart.name());
-      if (this.skinUuid != null) {
-         tag.putUUID("SkinUuid", this.skinUuid);
-      }
+   protected void saveAdditional(ValueOutput output) {
+      super.saveAdditional(output);
+      ragdollIdentity.save(output);
+      output.putString("BodyPart", this.bodyPart.name());
+      output.storeNullable("SkinUuid", UUIDUtil.CODEC, this.skinUuid);
 
-      tag.putFloat("MaxHealth", this.maxHealth);
-      tag.putBoolean("Corpse", this.corpse);
-      tag.putString("SkinName", this.skinName);
-      tag.putString("SkinTextures", this.skinTextures);
-      tag.putString("SkinTexturesSignature", this.skinTexturesSignature);
-      saveItem(tag, registries, "MainHandItem", this.mainHandItem);
-      saveItem(tag, registries, "OffHandItem", this.offHandItem);
-      saveItem(tag, registries, "HeadItem", this.headItem);
-      saveItem(tag, registries, "ChestItem", this.chestItem);
-      saveItem(tag, registries, "LegsItem", this.legsItem);
-      saveItem(tag, registries, "FeetItem", this.feetItem);
-      if (!this.curiosItems.isEmpty()) tag.put("CurioItems", saveSlotMap(this.curiosItems, registries));
-      if (!this.curiosCosmeticItems.isEmpty()) tag.put("CurioCosmeticItems", saveSlotMap(this.curiosCosmeticItems, registries));
-      if (!this.curiosRenderOptions.isEmpty()) tag.put("CurioRenderOptions", saveBooleanSlotMap(this.curiosRenderOptions));
-      if (!this.accessoriesItems.isEmpty()) tag.put("AccessoriesItems", saveSlotMap(this.accessoriesItems, registries));
-      if (!this.accessoriesCosmeticItems.isEmpty()) tag.put("AccessoriesCosmeticItems", saveSlotMap(this.accessoriesCosmeticItems, registries));
-      if (!this.accessoriesRenderOptions.isEmpty()) tag.put("AccessoriesRenderOptions", saveBooleanSlotMap(this.accessoriesRenderOptions));
+      output.putFloat("MaxHealth", this.maxHealth);
+      output.putBoolean("Corpse", this.corpse);
+      output.putString("SkinName", this.skinName);
+      output.putString("SkinTextures", this.skinTextures);
+      output.putString("SkinTexturesSignature", this.skinTexturesSignature);
+      saveItem(output, "MainHandItem", this.mainHandItem);
+      saveItem(output, "OffHandItem", this.offHandItem);
+      saveItem(output, "HeadItem", this.headItem);
+      saveItem(output, "ChestItem", this.chestItem);
+      saveItem(output, "LegsItem", this.legsItem);
+      saveItem(output, "FeetItem", this.feetItem);
+      if (!this.curiosItems.isEmpty()) output.store("CurioItems", SAVED_ITEM_SLOT_CODEC.listOf(), saveSlotMap(this.curiosItems));
+      if (!this.curiosCosmeticItems.isEmpty()) output.store("CurioCosmeticItems", SAVED_ITEM_SLOT_CODEC.listOf(), saveSlotMap(this.curiosCosmeticItems));
+      if (!this.curiosRenderOptions.isEmpty()) output.store("CurioRenderOptions", SAVED_BOOLEAN_SLOT_CODEC.listOf(), saveBooleanSlotMap(this.curiosRenderOptions));
+      if (!this.accessoriesItems.isEmpty()) output.store("AccessoriesItems", SAVED_ITEM_SLOT_CODEC.listOf(), saveSlotMap(this.accessoriesItems));
+      if (!this.accessoriesCosmeticItems.isEmpty()) output.store("AccessoriesCosmeticItems", SAVED_ITEM_SLOT_CODEC.listOf(), saveSlotMap(this.accessoriesCosmeticItems));
+      if (!this.accessoriesRenderOptions.isEmpty()) output.store("AccessoriesRenderOptions", SAVED_BOOLEAN_SLOT_CODEC.listOf(), saveBooleanSlotMap(this.accessoriesRenderOptions));
    }
 
    @Override
-   protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
-      super.loadAdditional(tag, registries);
-        ragdollIdentity.load(tag);
-      this.bodyPart = BodyPart.byName(tag.getString("BodyPart"));
-      this.maxHealth = tag.contains("MaxHealth") ? tag.getFloat("MaxHealth") : 20f;
-      this.corpse = tag.getBoolean("Corpse");
-      this.skinUuid = tag.hasUUID("SkinUuid") ? tag.getUUID("SkinUuid") : null;
-      this.skinName = tag.getString("SkinName").isBlank() ? "Player" : tag.getString("SkinName");
-      this.skinTextures = tag.getString("SkinTextures");
-      this.skinTexturesSignature = tag.getString("SkinTexturesSignature");
-      this.mainHandItem = loadItem(tag, registries, "MainHandItem");
-      this.offHandItem = loadItem(tag, registries, "OffHandItem");
-      this.headItem = loadItem(tag, registries, "HeadItem");
-      this.chestItem = loadItem(tag, registries, "ChestItem");
-      this.legsItem = loadItem(tag, registries, "LegsItem");
-      this.feetItem = loadItem(tag, registries, "FeetItem");
-      loadSlotMap(tag, registries, "CurioItems", this.curiosItems);
-      loadSlotMap(tag, registries, "CurioCosmeticItems", this.curiosCosmeticItems);
-      loadBooleanSlotMap(tag, "CurioRenderOptions", this.curiosRenderOptions);
-      loadSlotMap(tag, registries, "AccessoriesItems", this.accessoriesItems);
-      loadSlotMap(tag, registries, "AccessoriesCosmeticItems", this.accessoriesCosmeticItems);
-      loadBooleanSlotMap(tag, "AccessoriesRenderOptions", this.accessoriesRenderOptions);
+   protected void loadAdditional(ValueInput input) {
+      super.loadAdditional(input);
+      ragdollIdentity.load(input);
+      this.bodyPart = BodyPart.byName(input.getStringOr("BodyPart", ""));
+      this.maxHealth = input.getFloatOr("MaxHealth", 20f);
+      this.corpse = input.getBooleanOr("Corpse", false);
+      this.skinUuid = input.read("SkinUuid", UUIDUtil.CODEC).orElse(null);
+      this.skinName = input.getStringOr("SkinName", "").isBlank() ? "Player" : input.getStringOr("SkinName", "");
+      this.skinTextures = input.getStringOr("SkinTextures", "");
+      this.skinTexturesSignature = input.getStringOr("SkinTexturesSignature", "");
+      this.mainHandItem = loadItem(input, "MainHandItem");
+      this.offHandItem = loadItem(input, "OffHandItem");
+      this.headItem = loadItem(input, "HeadItem");
+      this.chestItem = loadItem(input, "ChestItem");
+      this.legsItem = loadItem(input, "LegsItem");
+      this.feetItem = loadItem(input, "FeetItem");
+      loadSlotMap(input, "CurioItems", this.curiosItems);
+      loadSlotMap(input, "CurioCosmeticItems", this.curiosCosmeticItems);
+      loadBooleanSlotMap(input, "CurioRenderOptions", this.curiosRenderOptions);
+      loadSlotMap(input, "AccessoriesItems", this.accessoriesItems);
+      loadSlotMap(input, "AccessoriesCosmeticItems", this.accessoriesCosmeticItems);
+      loadBooleanSlotMap(input, "AccessoriesRenderOptions", this.accessoriesRenderOptions);
    }
 
    @Override
@@ -415,89 +440,60 @@ public final class RagdollPartBlockEntity extends BlockEntity implements BlockEn
       return this.saveCustomOnly(registries);
    }
 
-   private static void saveItem(CompoundTag tag, HolderLookup.Provider registries, String key, ItemStack stack) {
+   private static void saveItem(ValueOutput output, String key, ItemStack stack) {
       if (!stack.isEmpty()) {
-         tag.put(key, stack.save(registries));
+         output.store(key, ItemStack.CODEC, stack);
       }
    }
 
-   private static ItemStack loadItem(CompoundTag tag, HolderLookup.Provider registries, String key) {
-      return tag.contains(key) ? ItemStack.parse(registries, tag.getCompound(key)).orElse(ItemStack.EMPTY) : ItemStack.EMPTY;
+   private static ItemStack loadItem(ValueInput input, String key) {
+      return input.read(key, ItemStack.CODEC).orElse(ItemStack.EMPTY);
    }
 
-   private static ListTag saveSlotMap(Map<String, List<ItemStack>> slotMap, HolderLookup.Provider registries) {
-      ListTag list = new ListTag();
-      slotMap.forEach((slotId, stacks) -> {
-         CompoundTag slotTag = new CompoundTag();
-         slotTag.putString("SlotId", slotId);
-         ListTag itemList = new ListTag();
-         for (ItemStack stack : stacks) {
-            CompoundTag itemTag = new CompoundTag();
-            if (!stack.isEmpty()) itemTag.put("Item", stack.save(registries));
-            itemList.add(itemTag);
-         }
-         slotTag.put("Stacks", itemList);
-         list.add(slotTag);
-      });
-      return list;
+   private static List<SavedItemSlot> saveSlotMap(Map<String, List<ItemStack>> slotMap) {
+      return slotMap.entrySet().stream()
+            .map(entry -> new SavedItemSlot(entry.getKey(), entry.getValue().stream()
+                  .map(stack -> new SavedItem(stack.isEmpty() ? Optional.empty() : Optional.of(stack)))
+                  .toList()))
+            .toList();
    }
 
-   private static void loadSlotMap(CompoundTag tag, HolderLookup.Provider registries, String key, Map<String, List<ItemStack>> out) {
+   private static void loadSlotMap(ValueInput input, String key, Map<String, List<ItemStack>> out) {
       out.clear();
-      if (!tag.contains(key, Tag.TAG_LIST)) return;
-      ListTag list = tag.getList(key, Tag.TAG_COMPOUND);
-      for (int i = 0; i < list.size(); i++) {
-         CompoundTag slotTag = list.getCompound(i);
-         String slotId = slotTag.getString("SlotId");
-         ListTag itemList = slotTag.getList("Stacks", Tag.TAG_COMPOUND);
-         List<ItemStack> stacks = new ArrayList<>(itemList.size());
-         boolean hasItem = false;
-         for (int j = 0; j < itemList.size(); j++) {
-            CompoundTag itemTag = itemList.getCompound(j);
-            Tag itemNbt = itemTag.get("Item");
-            if (itemNbt != null) {
-               ItemStack stack = ItemStack.parse(registries, itemNbt).orElse(ItemStack.EMPTY);
-               stacks.add(stack);
-               if (!stack.isEmpty()) hasItem = true;
-            } else {
-               stacks.add(ItemStack.EMPTY);
-            }
-         }
-         if (hasItem) out.put(slotId, stacks);
-      }
-   }
-
-   private static ListTag saveBooleanSlotMap(Map<String, List<Boolean>> slotMap) {
-      ListTag list = new ListTag();
-      slotMap.forEach((slotId, options) -> {
-         CompoundTag slotTag = new CompoundTag();
-         slotTag.putString("SlotId", slotId);
-         ListTag optionList = new ListTag();
-         for (Boolean option : options) {
-            CompoundTag optionTag = new CompoundTag();
-            optionTag.putBoolean("Render", Boolean.TRUE.equals(option));
-            optionList.add(optionTag);
-         }
-         slotTag.put("Options", optionList);
-         list.add(slotTag);
+      input.listOrEmpty(key, SAVED_ITEM_SLOT_CODEC).forEach(slot -> {
+         List<ItemStack> stacks = slot.stacks().stream().map(item -> item.item().orElse(ItemStack.EMPTY)).toList();
+         if (stacks.stream().anyMatch(stack -> !stack.isEmpty())) out.put(slot.slotId(), stacks);
       });
-      return list;
    }
 
-   private static void loadBooleanSlotMap(CompoundTag tag, String key, Map<String, List<Boolean>> out) {
+   private static List<SavedBooleanSlot> saveBooleanSlotMap(Map<String, List<Boolean>> slotMap) {
+      return slotMap.entrySet().stream()
+            .map(entry -> new SavedBooleanSlot(entry.getKey(), entry.getValue().stream()
+                  .map(Boolean.TRUE::equals)
+                  .map(SavedBoolean::new)
+                  .toList()))
+            .toList();
+   }
+
+   private static void loadBooleanSlotMap(ValueInput input, String key, Map<String, List<Boolean>> out) {
       out.clear();
-      if (!tag.contains(key, Tag.TAG_LIST)) return;
-      ListTag list = tag.getList(key, Tag.TAG_COMPOUND);
-      for (int i = 0; i < list.size(); i++) {
-         CompoundTag slotTag = list.getCompound(i);
-         String slotId = slotTag.getString("SlotId");
-         ListTag optionList = slotTag.getList("Options", Tag.TAG_COMPOUND);
-         List<Boolean> options = new ArrayList<>(optionList.size());
-         for (int j = 0; j < optionList.size(); j++) {
-            options.add(optionList.getCompound(j).getBoolean("Render"));
+      input.listOrEmpty(key, SAVED_BOOLEAN_SLOT_CODEC).forEach(slot -> {
+         if (!slot.slotId().isBlank()) {
+            out.put(slot.slotId(), slot.options().stream().map(SavedBoolean::render).toList());
          }
-         if (!slotId.isBlank()) out.put(slotId, List.copyOf(options));
-      }
+      });
+   }
+
+   private record SavedItem(Optional<ItemStack> item) {
+   }
+
+   private record SavedItemSlot(String slotId, List<SavedItem> stacks) {
+   }
+
+   private record SavedBoolean(boolean render) {
+   }
+
+   private record SavedBooleanSlot(String slotId, List<SavedBoolean> options) {
    }
 
    private final class GrabConstraint {

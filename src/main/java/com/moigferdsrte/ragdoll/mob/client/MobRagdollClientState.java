@@ -1,12 +1,10 @@
 package com.moigferdsrte.ragdoll.mob.client;
 
-import java.util.Collections;
-import java.util.Set;
-import java.util.WeakHashMap;
+import com.moigferdsrte.ragdoll.fabric.FabricEntityData;
 import net.minecraft.world.entity.Entity;
 
 public final class MobRagdollClientState {
-    private static final Set<Entity> HIDDEN_SOURCES = Collections.newSetFromMap(new WeakHashMap<>());
+    private static final WeakIdentitySet<Entity> HIDDEN_SOURCES = new WeakIdentitySet<>();
     private static final String DEATH_PENDING_UNTIL = "sable_player_ragdoll_death_pending_until";
     private static final int DEATH_PENDING_TICKS = 60;
 
@@ -27,7 +25,7 @@ public final class MobRagdollClientState {
     }
 
     public static void setDeathPending(Entity entity) {
-        com.moigferdsrte.ragdoll.fabric.FabricEntityData.putLong(entity,
+        FabricEntityData.putLong(entity,
                 DEATH_PENDING_UNTIL,
                 entity.level().getGameTime() + DEATH_PENDING_TICKS);
     }
@@ -35,7 +33,7 @@ public final class MobRagdollClientState {
     public static boolean isDeathPending(Entity entity) {
         var data = com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(entity);
         if (!data.contains(DEATH_PENDING_UNTIL)) return false;
-        if (entity.level().getGameTime() < data.getLong(DEATH_PENDING_UNTIL)) return true;
+        if (entity.level().getGameTime() < data.getLongOr(DEATH_PENDING_UNTIL, 0L)) return true;
         data.remove(DEATH_PENDING_UNTIL);
         return false;
     }

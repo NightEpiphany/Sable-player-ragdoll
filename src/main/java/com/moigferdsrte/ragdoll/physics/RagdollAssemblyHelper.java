@@ -119,7 +119,7 @@ public final class RagdollAssemblyHelper {
       BlockPos basePos = BlockPos.containing(baseCenter);
       for (int i = 0; i < PARTS.length; i++) {
          PartSpawn part = PARTS[i];
-         BlockPos safePos = new BlockPos(basePos.getX(), level.getMaxBuildHeight() - 1 - i, basePos.getZ());
+         BlockPos safePos = new BlockPos(basePos.getX(), level.getMaxY() - i, basePos.getZ());
          ServerSubLevel subLevel = assemblePart(level, safePos, part, profile, equipmentSource);
          if (subLevel != null) {
             spawnedParts.put(part.bodyPart(), new SpawnedPart(subLevel, baseCenter, subLevel.getPlot().getCenterBlock(), rightOffset(part, limbs.get(part.bodyPart()))));
@@ -272,7 +272,6 @@ public final class RagdollAssemblyHelper {
       if (blockEntity instanceof RagdollPartBlockEntity ragdollPart) {
          if (equipmentSource != null) {
             ragdollPart.configure(part.bodyPart(), equipmentSource);
-            RagdollEquipmentHelper.applyExtraEquipment(ragdollPart, equipmentSource);
          } else {
             ragdollPart.configure(part.bodyPart(), profile);
          }

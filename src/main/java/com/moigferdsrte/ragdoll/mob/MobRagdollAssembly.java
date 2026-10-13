@@ -42,9 +42,10 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.UUIDUtil;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.RandomSource;
@@ -52,6 +53,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.monster.Creeper;
@@ -146,7 +148,7 @@ public final class MobRagdollAssembly {
         }
         if (isConverted(entity) || SPAWN_QUEUE.stream().anyMatch(pending -> pending.entityUUID.equals(entity.getUUID()))) return;
         MobRagdollSourceRecovery.begin(entity, session, level.getGameTime() + (long) durationTicks);
-        fallApartOnDeath |= entity.getType().is(MobRagdollEntityTags.FALL_APART_ON_DEATH);
+        fallApartOnDeath |= entity.typeHolder().is(MobRagdollEntityTags.FALL_APART_ON_DEATH);
 
         Float clientYaw = CLIENT_BODY_YAW.remove(entity.getUUID());
         float yaw = clientYaw != null ? clientYaw
@@ -217,15 +219,15 @@ public final class MobRagdollAssembly {
     }
 
     public static UUID spawnMobless(ServerLevel level, EntityType<?> type, Vec3 pos, Vec3 linear, int durationTicks) {
-        if (type == null || !(type.create(level) instanceof LivingEntity living)) {
+        if (type == null || !(type.create(level, EntitySpawnReason.TRIGGERED) instanceof LivingEntity living)) {
             return null;
         }
-        living.moveTo(pos.x, pos.y, pos.z, living.getYRot(), living.getXRot());
+        living.snapTo(pos.x, pos.y, pos.z, living.getYRot(), living.getXRot());
         if (living instanceof Mob mob) {
             mob.setNoAi(true);
         }
         living.setSilent(true);
-        living.setInvulnerable(true);
+        living.setPermanentlyInvulnerable(true);
         com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(living).putLong(MOBLESS_SOURCE, level.getGameTime() + PENDING_LAUNCH_TIMEOUT_TICKS);
         if (!level.addFreshEntity(living)) {
             return null;
@@ -510,9 +512,10 @@ public final class MobRagdollAssembly {
             entity.discard();
             return;
         }
-        if (!MobRagdollSourceRecovery.hasRecord(entity)
-                && com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(entity).hasUUID(RagdollBlockLifetime.SOURCE_SESSION)) {
-            UUID session = com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(entity).getUUID(RagdollBlockLifetime.SOURCE_SESSION);
+        UUID trackedSession = com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(entity)
+                .read(RagdollBlockLifetime.SOURCE_SESSION, UUIDUtil.CODEC).orElse(null);
+        if (!MobRagdollSourceRecovery.hasRecord(entity) && trackedSession != null) {
+            UUID session = trackedSession;
             var saved = MobRagdollAssemblyData.loaded(level).get(session);
             showRagdollSource(entity);
             long deadline = saved == null ? level.getGameTime() : saved.spawnedAtTick() + saved.durationTicks();
@@ -560,7 +563,7 @@ public final class MobRagdollAssembly {
         }
         RAGDOLL_PIPE_ACTIVE.set(true);
         try {
-            return target.interact(player, hand);
+            return target.interact(player, hand, target.position());
         } finally {
             RAGDOLL_PIPE_ACTIVE.set(false);
         }
@@ -625,7 +628,7 @@ public final class MobRagdollAssembly {
         wailing.putLong("EndTick", start + resolved.durationTicks());
         wailing.putDouble("Stiffness", resolved.stiffness());
         wailing.putInt("IntervalTicks", resolved.intervalTicks());
-        wailing.putLong("Seed", level.random.nextLong());
+        wailing.putLong("Seed", level.getRandom().nextLong());
         CompoundTag sessionTag = root.ragdollIdentity().session();
         if (sessionTag.contains(RECOVERY_KEY)) return;
         sessionTag.put(WAILING_KEY, wailing);
@@ -691,7 +694,7 @@ public final class MobRagdollAssembly {
             JOINT_CHECK_SCHEDULES.put(session, new JointCheckSchedule(level, schedule.nextTick(), now));
             return false;
         }
-        JOINT_CHECK_SCHEDULES.put(session, new JointCheckSchedule(level, now + 10 + level.random.nextInt(11), now));
+        JOINT_CHECK_SCHEDULES.put(session, new JointCheckSchedule(level, now + 10 + level.getRandom().nextInt(11), now));
         return true;
     }
 
@@ -749,7 +752,7 @@ public final class MobRagdollAssembly {
         var sourceData = com.moigferdsrte.ragdoll.fabric.FabricEntityData.peek(source);
         if (sourceData == null) return;
         if (sourceData.contains(MOBLESS_SOURCE)
-                && level.getGameTime() >= sourceData.getLong(MOBLESS_SOURCE)) {
+                && level.getGameTime() >= sourceData.getLongOr(MOBLESS_SOURCE, 0L)) {
             source.discard();
             return;
         }
@@ -804,7 +807,7 @@ public final class MobRagdollAssembly {
 
         CompoundTag sessionTag = root.ragdollIdentity().session();
         if (sessionTag.contains(RECOVERY_KEY)) {
-            return level.getGameTime() < sessionTag.getCompound(RECOVERY_KEY).getLong("EndTick");
+            return level.getGameTime() < sessionTag.getCompoundOrEmpty(RECOVERY_KEY).getLongOr("EndTick", 0L);
         }
 
         SpawnedPart rootPart = selectRoot(state.parts());
@@ -852,9 +855,9 @@ public final class MobRagdollAssembly {
     private static void tickRecovery(ServerLevel level, MobRagdollPartBlockEntity rootBlock,
                                      RigidBodyHandle handle) {
         if (!handle.isValid()) return;
-        CompoundTag recovery = rootBlock.ragdollIdentity().session().getCompound(RECOVERY_KEY);
-        long start = recovery.getLong("StartTick");
-        long end = recovery.getLong("EndTick");
+        CompoundTag recovery = rootBlock.ragdollIdentity().session().getCompoundOrEmpty(RECOVERY_KEY);
+        long start = recovery.getLongOr("StartTick", 0L);
+        long end = recovery.getLongOr("EndTick", 0L);
         double duration = Math.max(1.0, end - start);
         double progress = Math.max(0.0, Math.min(1.0, (level.getGameTime() - start) / duration));
 
@@ -862,8 +865,8 @@ public final class MobRagdollAssembly {
         var containing = dev.ryanhcode.sable.Sable.HELPER.getContaining(level, rootBlock.getBlockPos());
         if (!(containing instanceof ServerSubLevel rootBody) || rootBody.isRemoved()) return;
         current.set(rootBody.logicalPose().orientation()).normalize();
-        Quaterniond target = new Quaterniond(recovery.getDouble("TargetX"), recovery.getDouble("TargetY"),
-                recovery.getDouble("TargetZ"), recovery.getDouble("TargetW")).normalize();
+        Quaterniond target = new Quaterniond(recovery.getDoubleOr("TargetX", 0.0), recovery.getDoubleOr("TargetY", 0.0),
+                recovery.getDoubleOr("TargetZ", 0.0), recovery.getDoubleOr("TargetW", 1.0)).normalize();
         Quaterniond error = target.mul(new Quaterniond(current).conjugate()).normalize();
         if (error.w < 0.0) error.set(-error.x, -error.y, -error.z, -error.w);
 
@@ -882,7 +885,7 @@ public final class MobRagdollAssembly {
         Vector3d currentLinear = handle.getLinearVelocity(new Vector3d());
         Vector3d currentAngular = handle.getAngularVelocity(new Vector3d());
         double verticalSpeed = progress < 0.55
-                ? Math.max(currentLinear.y, recovery.getDouble("LiftSpeed"))
+                ? Math.max(currentLinear.y, recovery.getDoubleOr("LiftSpeed", 0.0))
                 : currentLinear.y;
         Vector3d desiredLinear = new Vector3d(currentLinear.x * 0.75, verticalSpeed, currentLinear.z * 0.75);
         handle.addLinearAndAngularVelocity(desiredLinear.sub(currentLinear), desiredAngular.sub(currentAngular));
@@ -892,12 +895,12 @@ public final class MobRagdollAssembly {
         RagdollState state = state(level, session);
         MobRagdollPartBlockEntity root = state == null ? null : rootBlock(level, state);
         if (root == null || !root.ragdollIdentity().session().contains(RECOVERY_KEY)) return null;
-        return root.ragdollIdentity().session().getCompound(RECOVERY_KEY);
+        return root.ragdollIdentity().session().getCompoundOrEmpty(RECOVERY_KEY);
     }
 
     private static MobRagdollEndEvent.Reason recoveryReason(CompoundTag recovery) {
         try {
-            return MobRagdollEndEvent.Reason.valueOf(recovery.getString("Reason"));
+            return MobRagdollEndEvent.Reason.valueOf(recovery.getStringOr("Reason", ""));
         } catch (IllegalArgumentException ignored) {
             return MobRagdollEndEvent.Reason.EXPIRED;
         }
@@ -920,7 +923,7 @@ public final class MobRagdollAssembly {
         var id = block.ragdollIdentity();
         if (id.owner() == null || id.severed() || !block.renderAnchor()) return;
         var tag = id.assembly();
-        if (!tag.hasUUID("EntityId")) return;
+        if (tag.read("EntityId", UUIDUtil.CODEC).isEmpty()) return;
         CachedAssemblyState cached = ASSEMBLY_STATE_CACHE.get(id.owner());
         if (cached == null || cached.level() != level || cached.tick() != level.getGameTime()) {
             var family = com.moigferdsrte.ragdoll.physics.RagdollRelationships.members(block);
@@ -933,26 +936,26 @@ public final class MobRagdollAssembly {
         if (beginJointCheck(level, id.owner())) {
             if (state.parts().size() == data.partIds().size()) persistHierarchy(level, state.parts());
             attachJoints(level, state.parts());
-            if (id.session().getBoolean("MobRoot") && id.session().contains(RECOVERY_KEY)) {
+            if (id.session().getBooleanOr("MobRoot", false) && id.session().contains(RECOVERY_KEY)) {
                 tuneRecoveryMotors(id.owner());
             }
         }
-        if (id.session().getBoolean("MobRoot") && "MOB".equals(id.lifetime())
+        if (id.session().getBooleanOr("MobRoot", false) && "MOB".equals(id.lifetime())
                 && id.expiresAt() - level.getGameTime() <= RECOVERY_LEAD_TICKS
                 && id.source() != null && level.getEntity(id.source()) instanceof LivingEntity source) {
             beginRecovery(level, id.owner(), source, MobRagdollEndEvent.Reason.EXPIRED);
         }
-        if (id.session().getBoolean("MobRoot")) {
+        if (id.session().getBooleanOr("MobRoot", false)) {
             if (id.session().contains(RECOVERY_KEY)) tickRecovery(level, block, handle);
             else tickWailing(level, id.owner(), state, block);
         }
-        if (!id.session().getBoolean("MobRoot") || id.source() == null) return;
+        if (!id.session().getBooleanOr("MobRoot", false) || id.source() == null) return;
         if (!(level.getEntity(id.source()) instanceof LivingEntity source)
                 || !MobRagdollSourceRecovery.matches(source, id.owner()) || !MobRagdollSourceRecovery.active(source)) return;
         var physics = SubLevelPhysicsSystem.get(level);
         if (physics != null) applyImpactDamage(level, source.getUUID(), state, physics, level.getGameTime());
         Vec3 position = sourcePosition(state, source);
-        source.moveTo(position.x, position.y, position.z, source.getYRot(), source.getXRot());
+        source.snapTo(position.x, position.y, position.z, source.getYRot(), source.getXRot());
         source.setDeltaMovement(Vec3.ZERO);
     }
 
@@ -1002,8 +1005,8 @@ public final class MobRagdollAssembly {
                 PartSpawn part = pending.parts.get(i);
                 int maxYOffset = MobRagdollGeometry.maxAxisBlockOffset(part.ySize());
                 int minYOffset = MobRagdollGeometry.minAxisBlockOffset(part.ySize());
-                int safeY = level.getMaxBuildHeight() - 1 - maxYOffset - i * 8;
-                safeY = Math.max(level.getMinBuildHeight() - minYOffset, safeY);
+                int safeY = level.getMaxY() - maxYOffset - i * 8;
+                safeY = Math.max(level.getMinY() - minYOffset, safeY);
                 BlockPos safePos = new BlockPos(pending.baseBlockPos.getX(), safeY, pending.baseBlockPos.getZ());
                 AssembledPart assembled = assemblePart(level, safePos, part, pending.entityUUID, pending.entityNetworkId);
                 if (assembled != null) {
@@ -1101,13 +1104,13 @@ public final class MobRagdollAssembly {
             if (!discard && state != null) {
                 float yaw = bodyYaw(source);
                 Vec3 position = sourcePosition(state, source);
-                source.moveTo(position.x, position.y, position.z, yaw, source.getXRot());
+                source.snapTo(position.x, position.y, position.z, yaw, source.getXRot());
                 restoreRotation(source, yaw);
             }
             //restore before callbacks
             showRagdollSource(source);
             syncClientSourceState(source, false);
-            if (discard) source.kill();
+            if (discard) source.kill(level);
             RagdollFabricEvents.fire(new MobRagdollEndEvent(source, velocity, reason));
         }
         for (var be : RagdollBlockOwnership.loadedBlocks(level)) {
@@ -1179,7 +1182,7 @@ public final class MobRagdollAssembly {
                 Vec3 impactPos = impactSubLevel.logicalPose().transformPosition(
                         Vec3.atCenterOf(impactSubLevel.getPlot().getCenterBlock()));
                 float volume = (float) Math.min(1.0, maxDelta / 20.0);
-                float pitch = 0.8F + level.random.nextFloat() * 0.4F;
+                float pitch = 0.8F + level.getRandom().nextFloat() * 0.4F;
                 boolean heavy = maxDelta >= IMPACT_DAMAGE_THRESHOLD;
                 level.playSound(null, impactPos.x, impactPos.y, impactPos.z,
                         heavy ? net.minecraft.sounds.SoundEvents.PLAYER_BIG_FALL : net.minecraft.sounds.SoundEvents.PLAYER_SMALL_FALL,
@@ -1188,9 +1191,9 @@ public final class MobRagdollAssembly {
                 for (int p = 0; p < particleCount; p++) {
                     level.sendParticles(
                             net.minecraft.core.particles.ParticleTypes.CAMPFIRE_COSY_SMOKE,
-                            impactPos.x + (level.random.nextDouble() - 0.5) * 0.5,
-                            impactPos.y + level.random.nextDouble() * 0.5,
-                            impactPos.z + (level.random.nextDouble() - 0.5) * 0.5,
+                            impactPos.x + (level.getRandom().nextDouble() - 0.5) * 0.5,
+                            impactPos.y + level.getRandom().nextDouble() * 0.5,
+                            impactPos.z + (level.getRandom().nextDouble() - 0.5) * 0.5,
                             1, 0.0, 0.0, 0.0, 0.01);
                 }
             }
@@ -1225,15 +1228,15 @@ public final class MobRagdollAssembly {
             Vec3 partCenter = body.logicalPose().transformPosition(Vec3.atCenterOf(part.plotPos()));
             Vec3 offset = partCenter.subtract(center);
             if (offset.lengthSqr() < 1.0E-6) {
-                offset = new Vec3(level.random.nextDouble() - 0.5, 0.25,
-                        level.random.nextDouble() - 0.5);
+                offset = new Vec3(level.getRandom().nextDouble() - 0.5, 0.25,
+                        level.getRandom().nextDouble() - 0.5);
             }
             double attenuation = Math.max(0.45, 1.0 - offset.length() / Math.max(1.0, radius * 2.5));
             Vec3 impulse = offset.add(0.0, 0.35, 0.0).normalize().scale(baseSpeed * attenuation);
             Vector3d angular = new Vector3d(
-                    level.random.nextDouble() * 12.0 - 6.0,
-                    level.random.nextDouble() * 12.0 - 6.0,
-                    level.random.nextDouble() * 12.0 - 6.0);
+                    level.getRandom().nextDouble() * 12.0 - 6.0,
+                    level.getRandom().nextDouble() * 12.0 - 6.0,
+                    level.getRandom().nextDouble() * 12.0 - 6.0);
             RigidBodyHandle handle = RigidBodyHandle.of(body);
             if (handle.isValid()) {
                 handle.addLinearAndAngularVelocity(new Vector3d(impulse.x, impulse.y, impulse.z), angular);
@@ -1278,24 +1281,24 @@ public final class MobRagdollAssembly {
                                     MobRagdollPartBlockEntity root) {
         CompoundTag sessionTag = root.ragdollIdentity().session();
         if (!sessionTag.contains(WAILING_KEY)) return;
-        CompoundTag wailing = sessionTag.getCompound(WAILING_KEY);
+        CompoundTag wailing = sessionTag.getCompoundOrEmpty(WAILING_KEY);
         long now = level.getGameTime();
-        if (now >= wailing.getLong("EndTick")) {
+        if (now >= wailing.getLongOr("EndTick", 0L)) {
             restoreMobMotors(session);
             sessionTag.remove(WAILING_KEY);
             root.ragdollIdentity().session(sessionTag);
             root.setChanged();
             return;
         }
-        long start = wailing.getLong("StartTick");
-        int interval = Math.max(1, wailing.getInt("IntervalTicks"));
+        long start = wailing.getLongOr("StartTick", 0L);
+        int interval = Math.max(1, wailing.getIntOr("IntervalTicks", 1));
         if (now < start || (now - start) % interval != 0) return;
 
         long step = (now - start) / interval;
-        RandomSource random = RandomSource.create(wailing.getLong("Seed") ^ step * 0x9E3779B97F4A7C15L);
+        RandomSource random = RandomSource.create(wailing.getLongOr("Seed", 0L) ^ step * 0x9E3779B97F4A7C15L);
         Map<UUID, MobPartRole> roles = new java.util.HashMap<>();
         for (var part : state.parts()) roles.put(limbId(part), part.part().role());
-        double stiffness = wailing.getDouble("Stiffness");
+        double stiffness = wailing.getDoubleOr("Stiffness", 0.0);
         for (var entry : JOINT_BY_CHILD.entrySet()) {
             LiveJoint joint = entry.getValue();
             if (!session.equals(joint.session()) || !joint.handle().isValid()) continue;
@@ -1352,7 +1355,7 @@ public final class MobRagdollAssembly {
         for (SpawnedPart child : parts) {
             var childBlock = level.getBlockEntity(child.plotPos());
             if (!(childBlock instanceof RagdollOwnedBlock owned)) continue;
-            if (owned.ragdollIdentity().session().getBoolean("MobJointInitialized")) continue;
+            if (owned.ragdollIdentity().session().getBooleanOr("MobJointInitialized", false)) continue;
             SpawnedPart parent = child == root ? null : selectParent(child, parts, root);
             CompoundTag joint = new CompoundTag();
             joint.putBoolean("MobJointInitialized", true);
@@ -1385,9 +1388,9 @@ public final class MobRagdollAssembly {
     }
 
     private static Vector3d anchor(CompoundTag tag, String key, BlockPos pos) {
-        var vector = tag.getCompound(key);
-        return new Vector3d(pos.getX() + 0.5 + vector.getDouble("X"), pos.getY() + 0.5 + vector.getDouble("Y"),
-                pos.getZ() + 0.5 + vector.getDouble("Z"));
+        var vector = tag.getCompoundOrEmpty(key);
+        return new Vector3d(pos.getX() + 0.5 + vector.getDoubleOr("X", 0.0), pos.getY() + 0.5 + vector.getDoubleOr("Y", 0.0),
+                pos.getZ() + 0.5 + vector.getDoubleOr("Z", 0.0));
     }
 
     private static boolean jointMatches(ServerLevel level, UUID childLimb, LiveJoint joint) {
@@ -1418,11 +1421,12 @@ public final class MobRagdollAssembly {
             removeJoint(id.limb());
             if (parent == null || parent.subLevel() == child.subLevel()) continue;
             var joint = id.session();
-            if (!joint.getBoolean("MobJointInitialized")) continue;
+            if (!joint.getBooleanOr("MobJointInitialized", false)) continue;
             try {
                 var config = SableConstraintCompat.generic(anchor(joint, "ParentOffset", parent.plotPos()),
                         anchor(joint, "ChildOffset", child.plotPos()),
-                        new Quaterniond(joint.getDouble("FrameX"), joint.getDouble("FrameY"), joint.getDouble("FrameZ"), joint.getDouble("FrameW")),
+                        new Quaterniond(joint.getDoubleOr("FrameX", 0.0), joint.getDoubleOr("FrameY", 0.0),
+                                joint.getDoubleOr("FrameZ", 0.0), joint.getDoubleOr("FrameW", 1.0)),
                         new Quaterniond(), Set.of(ConstraintJointAxis.LINEAR_X, ConstraintJointAxis.LINEAR_Y, ConstraintJointAxis.LINEAR_Z));
                 var handle = SableConstraintCompat.addConstraint(system.getPipeline(), parent.subLevel(), child.subLevel(), config);
                 handle.setContactsEnabled(false);
@@ -1447,7 +1451,7 @@ public final class MobRagdollAssembly {
     private static SpawnedPart selectRoot(List<SpawnedPart> parts) {
         for (var part : parts) {
             if (part.subLevel().getLevel().getBlockEntity(part.plotPos()) instanceof RagdollOwnedBlock block
-                    && block.ragdollIdentity().session().getBoolean("MobRoot")) return part;
+                    && block.ragdollIdentity().session().getBooleanOr("MobRoot", false)) return part;
         }
         return parts.stream()
                 .filter(part -> part.part().role() == MobPartRole.TORSO)
@@ -1512,9 +1516,9 @@ public final class MobRagdollAssembly {
             level.setBlock(blockPos, partState, 3);
             if (level.getBlockEntity(blockPos) instanceof MobRagdollPartBlockEntity blockEntity) {
                 if (blockPos.equals(pos)) {
-                    ResourceLocation texture = ResourceLocation.tryParse(part.texture());
+                    Identifier texture = Identifier.tryParse(part.texture());
                     blockEntity.configure(
-                            texture == null ? ResourceLocation.withDefaultNamespace("textures/block/light_blue_stained_glass.png") : texture,
+                            texture == null ? Identifier.withDefaultNamespace("textures/block/light_blue_stained_glass.png") : texture,
                             part.quads().stream()
                                     .map(quad -> new MobRagdollPartBlockEntity.Quad(
                                             quad.vertices().stream()
@@ -1525,7 +1529,7 @@ public final class MobRagdollAssembly {
                                             quad.normalZ()
                             ))
                                     .toList(),
-                            ResourceLocation.tryParse(part.entityType()),
+                            Identifier.tryParse(part.entityType()),
                             sourceEntityId,
                             sourceEntityNetworkId,
                             part.partName(),

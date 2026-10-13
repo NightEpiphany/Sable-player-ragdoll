@@ -4,14 +4,16 @@ import com.moigferdsrte.ragdoll.block.entity.RagdollPartBlockEntity;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.sublevel.plot.LevelPlot;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.item.ArmorItem;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.ItemAttributeModifiers;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -21,13 +23,13 @@ import snownee.jade.api.IServerDataProvider;
 public final class RagdollPartServerDataProvider implements IServerDataProvider<BlockAccessor> {
     public static final RagdollPartServerDataProvider INSTANCE = new RagdollPartServerDataProvider();
 
-    private static final ResourceLocation UID = ResourceLocation.fromNamespaceAndPath("sable_player_ragdoll", "ragdoll_part_data");
+    private static final Identifier UID = Identifier.fromNamespaceAndPath("sable_player_ragdoll", "ragdoll_part_data");
 
     private RagdollPartServerDataProvider() {
     }
 
     @Override
-    public ResourceLocation getUid() {
+    public Identifier getUid() {
         return UID;
     }
 
@@ -37,8 +39,8 @@ public final class RagdollPartServerDataProvider implements IServerDataProvider<
         if (!(be instanceof RagdollPartBlockEntity ragdoll)) {
             return;
         }
-        final String name = ragdoll.skinProfile().getName();
-        if (name != null) {
+        final String name = ragdoll.skinProfile().name();
+        if (!name.isBlank()) {
             data.putString("SkinName", name);
         }
         data.putString("BodyPart", ragdoll.bodyPart().getSerializedName());
@@ -49,7 +51,7 @@ public final class RagdollPartServerDataProvider implements IServerDataProvider<
         }
 
         if (accessor.getLevel() instanceof ServerLevel serverLevel) {
-            final ServerPlayer player = serverLevel.getServer().getPlayerList().getPlayer(ragdoll.skinProfile().getId());
+            final ServerPlayer player = serverLevel.getServer().getPlayerList().getPlayer(ragdoll.skinProfile().id());
             if (player != null) {
                 putLivingStats(data, player);
                 return;
@@ -61,9 +63,8 @@ public final class RagdollPartServerDataProvider implements IServerDataProvider<
         int armor = 0;
         for (final EquipmentSlot slot : ARMOR_SLOTS) {
             final ItemStack stack = ragdoll.itemBySlot(slot);
-            if (stack.getItem() instanceof ArmorItem armorItem) {
-                armor += armorItem.getDefense();
-            }
+            armor += (int) stack.getOrDefault(DataComponents.ATTRIBUTE_MODIFIERS, ItemAttributeModifiers.EMPTY)
+                    .compute(Attributes.ARMOR, 0.0, slot);
         }
         if (armor > 0) {
             data.putInt("Armor", armor);
@@ -94,7 +95,7 @@ public final class RagdollPartServerDataProvider implements IServerDataProvider<
         if (container == null) {
             return null;
         }
-        final LevelPlot plot = container.getPlot(new ChunkPos(pos));
+        final LevelPlot plot = container.getPlot(new ChunkPos(pos.getX() >> 4, pos.getZ() >> 4));
         if (plot == null) {
             return null;
         }

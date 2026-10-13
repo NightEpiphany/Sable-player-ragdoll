@@ -4,7 +4,7 @@ import com.moigferdsrte.ragdoll.mob.block.MobPartRole;
 import com.moigferdsrte.ragdoll.mob.block.entity.MobRagdollPartBlockEntity;
 import java.util.UUID;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -14,13 +14,13 @@ import snownee.jade.api.IServerDataProvider;
 public final class MobRagdollPartServerDataProvider implements IServerDataProvider<BlockAccessor> {
     public static final MobRagdollPartServerDataProvider INSTANCE = new MobRagdollPartServerDataProvider();
 
-    private static final ResourceLocation UID = ResourceLocation.fromNamespaceAndPath("sable_player_ragdoll", "mob_ragdoll_part_data");
+    private static final Identifier UID = Identifier.fromNamespaceAndPath("sable_player_ragdoll", "mob_ragdoll_part_data");
 
     private MobRagdollPartServerDataProvider() {
     }
 
     @Override
-    public ResourceLocation getUid() {
+    public Identifier getUid() {
         return UID;
     }
 
@@ -30,7 +30,7 @@ public final class MobRagdollPartServerDataProvider implements IServerDataProvid
         if (!(be instanceof MobRagdollPartBlockEntity mob)) {
             return;
         }
-        final ResourceLocation entityType = mob.entityType();
+        final Identifier entityType = mob.entityType();
         if (entityType != null) {
             data.putString("EntityType", entityType.toString());
         }

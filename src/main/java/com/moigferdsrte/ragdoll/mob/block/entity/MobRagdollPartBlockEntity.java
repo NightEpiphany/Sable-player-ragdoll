@@ -3,6 +3,8 @@ package com.moigferdsrte.ragdoll.mob.block.entity;
 import com.moigferdsrte.ragdoll.physics.RagdollBlockIdentity;
 import com.moigferdsrte.ragdoll.physics.RagdollBlockOwnership;
 import com.moigferdsrte.ragdoll.physics.RagdollOwnedBlock;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 import com.moigferdsrte.ragdoll.RagdollGrabCallbacks;
 import com.moigferdsrte.ragdoll.physics.RagdollAssemblyHelper;
@@ -29,24 +31,39 @@ import java.util.Map;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.UUIDUtil;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import net.minecraft.world.level.block.Block;
 import org.joml.Quaterniond;
 import org.joml.Vector3d;
 
 public final class MobRagdollPartBlockEntity extends BlockEntity implements BlockEntitySubLevelActor, RagdollOwnedBlock {
+    private static final Codec<Vertex> VERTEX_CODEC = RecordCodecBuilder.create(instance -> instance.group(
+            Codec.FLOAT.optionalFieldOf("X", 0.0F).forGetter(Vertex::x),
+            Codec.FLOAT.optionalFieldOf("Y", 0.0F).forGetter(Vertex::y),
+            Codec.FLOAT.optionalFieldOf("Z", 0.0F).forGetter(Vertex::z),
+            Codec.FLOAT.optionalFieldOf("U", 0.0F).forGetter(Vertex::u),
+            Codec.FLOAT.optionalFieldOf("V", 0.0F).forGetter(Vertex::v)
+    ).apply(instance, Vertex::new));
+    private static final Codec<Quad> QUAD_CODEC = RecordCodecBuilder.create(instance -> instance.group(
+            VERTEX_CODEC.listOf().optionalFieldOf("Vertices", List.of()).forGetter(Quad::vertices),
+            Codec.FLOAT.optionalFieldOf("NX", 0.0F).forGetter(Quad::normalX),
+            Codec.FLOAT.optionalFieldOf("NY", 0.0F).forGetter(Quad::normalY),
+            Codec.FLOAT.optionalFieldOf("NZ", 0.0F).forGetter(Quad::normalZ)
+    ).apply(instance, Quad::new));
+
     private final RagdollBlockIdentity ragdollIdentity = new RagdollBlockIdentity();
 
     @Override
@@ -74,8 +91,8 @@ public final class MobRagdollPartBlockEntity extends BlockEntity implements Bloc
     private static final double GRAB_HOLD_DISTANCE = 1.0;
     private static final double GRAB_ANCHOR_Y_OFFSET = -0.6;
     private static final double GRAB_MAX_DISTANCE = 4.0;
-    private ResourceLocation texture = ResourceLocation.withDefaultNamespace("textures/block/light_blue_stained_glass.png");
-    private ResourceLocation entityType;
+    private Identifier texture = Identifier.withDefaultNamespace("textures/block/light_blue_stained_glass.png");
+    private Identifier entityType;
     private String partName = "";
     private List<String> keepPartNames = List.of();
     private List<Quad> quads = List.of();
@@ -99,7 +116,7 @@ public final class MobRagdollPartBlockEntity extends BlockEntity implements Bloc
         super(MobRagdollBlocks.MOB_RAGDOLL_PART_ENTITY, pos, blockState);
     }
 
-    public void configure(ResourceLocation texture, List<Quad> quads, ResourceLocation entityType, UUID sourceEntityId, int sourceEntityNetworkId, String partName, List<String> keepPartNames, CompoundTag variantData, boolean baby, float renderScale, float renderQx, float renderQy, float renderQz, float renderQw, MobPartRole role, float visualXSize, float visualYSize, float visualZSize) {
+    public void configure(Identifier texture, List<Quad> quads, Identifier entityType, UUID sourceEntityId, int sourceEntityNetworkId, String partName, List<String> keepPartNames, CompoundTag variantData, boolean baby, float renderScale, float renderQx, float renderQy, float renderQz, float renderQw, MobPartRole role, float visualXSize, float visualYSize, float visualZSize) {
         this.texture = texture;
         this.quads = List.copyOf(quads);
         this.entityType = entityType;
@@ -123,7 +140,7 @@ public final class MobRagdollPartBlockEntity extends BlockEntity implements Bloc
     }
 
     public void configureCollisionOnly() {
-        this.texture = ResourceLocation.withDefaultNamespace("textures/block/light_blue_stained_glass.png");
+        this.texture = Identifier.withDefaultNamespace("textures/block/light_blue_stained_glass.png");
         this.quads = List.of();
         this.entityType = null;
         this.sourceEntityId = null;
@@ -145,7 +162,7 @@ public final class MobRagdollPartBlockEntity extends BlockEntity implements Bloc
         this.setChanged();
     }
 
-    public ResourceLocation texture() {
+    public Identifier texture() {
         return this.texture;
     }
 
@@ -153,7 +170,7 @@ public final class MobRagdollPartBlockEntity extends BlockEntity implements Bloc
         return this.quads;
     }
 
-    public ResourceLocation entityType() {
+    public Identifier entityType() {
         return this.entityType;
     }
 
@@ -330,116 +347,64 @@ public final class MobRagdollPartBlockEntity extends BlockEntity implements Bloc
     }
 
     @Override
-    protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
-        super.saveAdditional(tag, registries);
-        ragdollIdentity.save(tag);
-        tag.putString("Texture", this.texture.toString());
+    protected void saveAdditional(ValueOutput output) {
+        super.saveAdditional(output);
+        ragdollIdentity.save(output);
+        output.putString("Texture", this.texture.toString());
         if (this.entityType != null) {
-            tag.putString("EntityType", this.entityType.toString());
+            output.putString("EntityType", this.entityType.toString());
         }
-        if (this.sourceEntityId != null) {
-            tag.putUUID("SourceEntityId", this.sourceEntityId);
-        }
-        tag.putInt("SourceEntityNetworkId", this.sourceEntityNetworkId);
-        tag.putString("PartName", this.partName);
+        output.storeNullable("SourceEntityId", UUIDUtil.CODEC, this.sourceEntityId);
+        output.putInt("SourceEntityNetworkId", this.sourceEntityNetworkId);
+        output.putString("PartName", this.partName);
         if (this.variantData != null) {
-            tag.put("VariantData", this.variantData);
+            output.store("VariantData", CompoundTag.CODEC, this.variantData);
         }
-        tag.putBoolean("Baby", this.baby);
-        tag.putFloat("RenderScale", this.renderScale);
-        tag.putFloat("RenderQx", this.renderQx);
-        tag.putFloat("RenderQy", this.renderQy);
-        tag.putFloat("RenderQz", this.renderQz);
-        tag.putFloat("RenderQw", this.renderQw);
-        tag.putString("Role", this.role.getSerializedName());
-        tag.putBoolean("RenderAnchor", this.renderAnchor);
-        tag.putFloat("VisualXSize", this.visualXSize);
-        tag.putFloat("VisualYSize", this.visualYSize);
-        tag.putFloat("VisualZSize", this.visualZSize);
-        ListTag keepNameTags = new ListTag();
-        for (String keepPartName : this.keepPartNames) {
-            keepNameTags.add(net.minecraft.nbt.StringTag.valueOf(keepPartName));
-        }
-        tag.put("KeepPartNames", keepNameTags);
-        ListTag quadTags = new ListTag();
-        for (Quad quad : this.quads) {
-            CompoundTag quadTag = new CompoundTag();
-            quadTag.putFloat("NX", quad.normalX());
-            quadTag.putFloat("NY", quad.normalY());
-            quadTag.putFloat("NZ", quad.normalZ());
-            ListTag vertexTags = new ListTag();
-            for (Vertex vertex : quad.vertices()) {
-                CompoundTag vertexTag = new CompoundTag();
-                vertexTag.putFloat("X", vertex.x());
-                vertexTag.putFloat("Y", vertex.y());
-                vertexTag.putFloat("Z", vertex.z());
-                vertexTag.putFloat("U", vertex.u());
-                vertexTag.putFloat("V", vertex.v());
-                vertexTags.add(vertexTag);
-            }
-            quadTag.put("Vertices", vertexTags);
-            quadTags.add(quadTag);
-        }
-        tag.put("Quads", quadTags);
+        output.putBoolean("Baby", this.baby);
+        output.putFloat("RenderScale", this.renderScale);
+        output.putFloat("RenderQx", this.renderQx);
+        output.putFloat("RenderQy", this.renderQy);
+        output.putFloat("RenderQz", this.renderQz);
+        output.putFloat("RenderQw", this.renderQw);
+        output.putString("Role", this.role.getSerializedName());
+        output.putBoolean("RenderAnchor", this.renderAnchor);
+        output.putFloat("VisualXSize", this.visualXSize);
+        output.putFloat("VisualYSize", this.visualYSize);
+        output.putFloat("VisualZSize", this.visualZSize);
+        output.store("KeepPartNames", Codec.STRING.listOf(), this.keepPartNames);
+        output.store("Quads", QUAD_CODEC.listOf(), this.quads);
     }
 
     @Override
-    protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
-        super.loadAdditional(tag, registries);
-        ragdollIdentity.load(tag);
-        ResourceLocation parsed = ResourceLocation.tryParse(tag.getString("Texture"));
-        this.texture = parsed == null ? ResourceLocation.withDefaultNamespace("textures/block/light_blue_stained_glass.png") : parsed;
-        this.entityType = tag.contains("EntityType", Tag.TAG_STRING) ? ResourceLocation.tryParse(tag.getString("EntityType")) : null;
-        this.sourceEntityId = tag.hasUUID("SourceEntityId") ? tag.getUUID("SourceEntityId") : null;
-        this.sourceEntityNetworkId = tag.contains("SourceEntityNetworkId", Tag.TAG_INT) ? tag.getInt("SourceEntityNetworkId") : -1;
+    protected void loadAdditional(ValueInput input) {
+        super.loadAdditional(input);
+        ragdollIdentity.load(input);
+        Identifier parsed = Identifier.tryParse(input.getStringOr("Texture", ""));
+        this.texture = parsed == null ? Identifier.withDefaultNamespace("textures/block/light_blue_stained_glass.png") : parsed;
+        this.entityType = Identifier.tryParse(input.getStringOr("EntityType", ""));
+        this.sourceEntityId = input.read("SourceEntityId", UUIDUtil.CODEC).orElse(null);
+        this.sourceEntityNetworkId = input.getIntOr("SourceEntityNetworkId", -1);
         if (ragdollIdentity.severed()) {
             this.sourceEntityId = null;
             this.sourceEntityNetworkId = -1;
         }
-        this.partName = tag.getString("PartName");
-        this.variantData = tag.contains("VariantData") ? sanitizedVariantData(tag.getCompound("VariantData")) : null;
-        this.baby = tag.getBoolean("Baby");
-        this.renderScale = tag.contains("RenderScale", Tag.TAG_FLOAT) ? tag.getFloat("RenderScale") : 1.0F;
-        this.renderQx = tag.contains("RenderQx", Tag.TAG_FLOAT) ? tag.getFloat("RenderQx") : 0.0F;
-        this.renderQy = tag.contains("RenderQy", Tag.TAG_FLOAT) ? tag.getFloat("RenderQy") : 0.0F;
-        this.renderQz = tag.contains("RenderQz", Tag.TAG_FLOAT) ? tag.getFloat("RenderQz") : 0.0F;
-        this.renderQw = tag.contains("RenderQw", Tag.TAG_FLOAT) ? tag.getFloat("RenderQw") : 1.0F;
-        this.role = MobPartRole.byName(tag.getString("Role"));
-        this.renderAnchor = !tag.contains("RenderAnchor", Tag.TAG_BYTE) || tag.getBoolean("RenderAnchor");
-        this.visualXSize = tag.contains("VisualXSize", Tag.TAG_FLOAT) ? Math.max(1.0F, tag.getFloat("VisualXSize")) : 8.0F;
-        this.visualYSize = tag.contains("VisualYSize", Tag.TAG_FLOAT) ? Math.max(1.0F, tag.getFloat("VisualYSize")) : 8.0F;
-        this.visualZSize = tag.contains("VisualZSize", Tag.TAG_FLOAT) ? Math.max(1.0F, tag.getFloat("VisualZSize")) : 8.0F;
-        List<String> loadedKeepNames = new ArrayList<>();
-        if (tag.contains("KeepPartNames", Tag.TAG_LIST)) {
-            ListTag keepNameTags = tag.getList("KeepPartNames", Tag.TAG_STRING);
-            for (int i = 0; i < keepNameTags.size(); i++) {
-                loadedKeepNames.add(keepNameTags.getString(i));
-            }
-        }
-        this.keepPartNames = List.copyOf(loadedKeepNames);
-        List<Quad> loadedQuads = new ArrayList<>();
-        if (tag.contains("Quads", Tag.TAG_LIST)) {
-            ListTag quadTags = tag.getList("Quads", Tag.TAG_COMPOUND);
-            for (int i = 0; i < quadTags.size(); i++) {
-                CompoundTag quadTag = quadTags.getCompound(i);
-                List<Vertex> vertices = new ArrayList<>(4);
-                ListTag vertexTags = quadTag.getList("Vertices", Tag.TAG_COMPOUND);
-                for (int v = 0; v < vertexTags.size(); v++) {
-                    CompoundTag vertexTag = vertexTags.getCompound(v);
-                    vertices.add(new Vertex(
-                            vertexTag.getFloat("X"),
-                            vertexTag.getFloat("Y"),
-                            vertexTag.getFloat("Z"),
-                            vertexTag.getFloat("U"),
-                            vertexTag.getFloat("V")
-                    ));
-                }
-                if (vertices.size() == 4) {
-                    loadedQuads.add(new Quad(List.copyOf(vertices), quadTag.getFloat("NX"), quadTag.getFloat("NY"), quadTag.getFloat("NZ")));
-                }
-            }
-        }
-        this.quads = List.copyOf(loadedQuads);
+        this.partName = input.getStringOr("PartName", "");
+        this.variantData = input.read("VariantData", CompoundTag.CODEC).map(MobRagdollPartBlockEntity::sanitizedVariantData).orElse(null);
+        this.baby = input.getBooleanOr("Baby", false);
+        this.renderScale = input.getFloatOr("RenderScale", 1.0F);
+        this.renderQx = input.getFloatOr("RenderQx", 0.0F);
+        this.renderQy = input.getFloatOr("RenderQy", 0.0F);
+        this.renderQz = input.getFloatOr("RenderQz", 0.0F);
+        this.renderQw = input.getFloatOr("RenderQw", 1.0F);
+        this.role = MobPartRole.byName(input.getStringOr("Role", ""));
+        this.renderAnchor = input.getBooleanOr("RenderAnchor", true);
+        this.visualXSize = Math.max(1.0F, input.getFloatOr("VisualXSize", 8.0F));
+        this.visualYSize = Math.max(1.0F, input.getFloatOr("VisualYSize", 8.0F));
+        this.visualZSize = Math.max(1.0F, input.getFloatOr("VisualZSize", 8.0F));
+        this.keepPartNames = input.listOrEmpty("KeepPartNames", Codec.STRING).stream().toList();
+        this.quads = input.listOrEmpty("Quads", QUAD_CODEC).stream()
+                .filter(quad -> quad.vertices().size() == 4)
+                .toList();
     }
 
     @Override

@@ -2,8 +2,6 @@ package com.moigferdsrte.ragdoll.mixin.client;
 
 import com.moigferdsrte.ragdoll.fabric.client.RagdollCameraHelper;
 import net.minecraft.client.Camera;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -18,9 +16,9 @@ public abstract class RagdollFirstPersonEyeMixin {
 
    @Shadow
    protected abstract void setPosition(double x, double y, double z);
-   @WrapMethod(method = "setup")
-    private void sablePlayerRagdoll$anchorRagdollEye(BlockGetter area, Entity entity, boolean detached, boolean thirdPersonReverse, float partialTick, Operation<Void> original) {
-        original.call(area, entity, detached, thirdPersonReverse, partialTick);
+   @WrapMethod(method = "alignWithEntity")
+   private void sablePlayerRagdoll$anchorRagdollEye(float partialTick, Operation<Void> original) {
+      original.call(partialTick);
       Vec3 target = RagdollCameraHelper.firstPersonHeadAnchor(this.position, partialTick);
       if (target != this.position) {
          this.setPosition(target.x, target.y, target.z);

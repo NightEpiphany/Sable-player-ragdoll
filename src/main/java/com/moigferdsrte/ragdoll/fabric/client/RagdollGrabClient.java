@@ -10,6 +10,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.item.component.SwingAnimation;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
@@ -36,16 +37,13 @@ public final class RagdollGrabClient {
         }
         if (activePos != null) {
             player.setSprinting(false);
-            player.swingTime = 0;
-            player.swinging = true;
-            player.swingingArm = InteractionHand.MAIN_HAND;
             return;
         }
         BlockPos target = targetedPart(minecraft);
         if (target != null) {
             activePos = target;
             FabricClientNetwork.sendToServer(new RagdollGrabPacket(target, false));
-            player.swing(InteractionHand.MAIN_HAND);
+            player.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, false);
         }
     }
 
