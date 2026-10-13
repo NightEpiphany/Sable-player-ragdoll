@@ -17,7 +17,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.neoforge.common.NeoForge;
+import com.moigferdsrte.ragdoll.fabric.RagdollFabricEvents;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Vector3d;
 
@@ -62,7 +62,7 @@ public final class RagdollExpireHelper {
       Entity entity = level.getEntity(riderId);
       if (entity instanceof LivingEntity livingEntity) {
          if (livingEntity.getVehicle() != null) {
-            var seatTag = livingEntity.getVehicle().getPersistentData();
+            var seatTag = com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(livingEntity.getVehicle());
             if (seatTag.hasUUID(RagdollBlockLifetime.SOURCE_SESSION)
                   && !RagdollBlockOwnership.sessionId(subLevel).equals(seatTag.getUUID(RagdollBlockLifetime.SOURCE_SESSION))) return;
          }
@@ -86,7 +86,7 @@ public final class RagdollExpireHelper {
          if (livingEntity instanceof ServerPlayer player) {
             RagdollRegistry.suppressAfterRelease(player.getUUID(), level.getGameTime());
             RagdollSeatCallbacks.notifyReleased(player);
-            NeoForge.EVENT_BUS.post(new RagdollEndEvent(player, exitVelocity, endReason(subLevel)));
+            RagdollFabricEvents.fire(new RagdollEndEvent(player, exitVelocity, endReason(subLevel)));
          }
       }
    }
@@ -120,7 +120,7 @@ public final class RagdollExpireHelper {
       AABB bounds = plotBounds(subLevel);
       if (bounds != null) {
          for (RagdollSeatEntity seat : level.getEntitiesOfClass(RagdollSeatEntity.class, bounds)) {
-            var seatTag = seat.getPersistentData();
+            var seatTag = com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(seat);
             if (!seatTag.hasUUID(RagdollBlockLifetime.SOURCE_SESSION)
                   || !RagdollBlockOwnership.sessionId(subLevel).equals(seatTag.getUUID(RagdollBlockLifetime.SOURCE_SESSION))) continue;
             seat.ejectPassengers();

@@ -11,7 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.model.geom.ModelPart;
-import net.neoforged.fml.ModList;
+import net.fabricmc.loader.api.FabricLoader;
 
 public final class EmfVanillaModelCompat {
     private static final Class<?> STATEFUL_PART = optionalClass(
@@ -83,7 +83,7 @@ public final class EmfVanillaModelCompat {
 
     private static boolean isEmfLoaded() {
         try {
-            return ModList.get().isLoaded("entity_model_features");
+            return FabricLoader.getInstance().isModLoaded("entity_model_features");
         } catch (Throwable ignored) {
             return false;
         }

@@ -33,7 +33,7 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.neoforge.common.NeoForge;
+import com.moigferdsrte.ragdoll.fabric.RagdollFabricEvents;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Vector3d;
 import org.joml.Vector3dc;
@@ -84,7 +84,7 @@ public final class RagdollRegistry {
       }
 
       RagdollStartEvent event = new RagdollStartEvent(player, new Vec3(linear.x, linear.y, linear.z));
-      if (NeoForge.EVENT_BUS.post(event).isCanceled()) {
+      if (RagdollFabricEvents.fire(event).isCanceled()) {
          return null;
       }
       linear = new Vector3d(event.velocity().x, event.velocity().y, event.velocity().z);

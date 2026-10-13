@@ -2,11 +2,10 @@ package com.moigferdsrte.ragdoll.api;
 
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.bus.api.Event;
 
-// Fired on the NeoForge game event bus after a player has been released from a ragdoll.
+// Fired on the Fabric ragdoll event callbacks after a player has been released from a ragdoll.
 // exitVelocity is the velocity inherited by the player at the moment of release.
-public class RagdollEndEvent extends Event {
+public class RagdollEndEvent {
    private final ServerPlayer player;
    private final Vec3 exitVelocity;
    private final Reason reason;

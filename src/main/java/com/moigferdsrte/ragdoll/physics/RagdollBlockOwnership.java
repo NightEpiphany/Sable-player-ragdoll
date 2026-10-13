@@ -40,7 +40,7 @@ public final class RagdollBlockOwnership {
     public static UUID ownerForPlayer(ServerLevel level, UUID player) {
         var source = level.getEntity(player);
         if (source != null && source.getVehicle() != null) {
-            var tag = source.getVehicle().getPersistentData();
+            var tag = com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(source.getVehicle());
             if (tag.hasUUID(RagdollBlockLifetime.SOURCE_SESSION)) return tag.getUUID(RagdollBlockLifetime.SOURCE_SESSION);
         }
         for (var be : loadedBlocks(level)) {

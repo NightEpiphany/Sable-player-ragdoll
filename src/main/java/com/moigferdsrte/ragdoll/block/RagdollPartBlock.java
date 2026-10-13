@@ -7,7 +7,7 @@ import com.moigferdsrte.ragdoll.RagdollCollisionRules;
 import com.moigferdsrte.ragdoll.block.entity.RagdollPartBlockEntity;
 import com.moigferdsrte.ragdoll.block.entity.RagdollPartBlockEntity.BodyPart;
 import dev.ryanhcode.sable.api.block.BlockSubLevelCollisionShape;
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.BlockGetter;
@@ -89,17 +89,14 @@ public final class RagdollPartBlock extends Block implements EntityBlock, BlockS
       super.createBlockStateDefinition(builder.add(BODY_PART));
    }
 
-   @Override
    public VoxelShape getSubLevelCollisionShape(BlockGetter level, BlockState state) {
       return collisionShape(state);
    }
 
-   @Override
    public boolean canEntityDestroy(BlockState state, BlockGetter level, BlockPos pos, Entity entity) {
       return false;
    }
 
-   @Override
    public boolean canDropFromExplosion(BlockState state, BlockGetter level, BlockPos pos, Explosion explosion) {
       return false;
    }

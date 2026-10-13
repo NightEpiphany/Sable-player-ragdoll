@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "sable_player_ragdoll_test",
+  "version": "1.0.0",
+  "name": "Ragdoll Fabric integration tests",
+  "environment": "*",
+  "entrypoints": {
+    "fabric-gametest": ["com.moigferdsrte.ragdoll.fabric.RagdollGameTests"],
+    "client": ["com.moigferdsrte.ragdoll.fabric.RagdollClientSmokeTest"]
+  },
+  "depends": {"sable_player_ragdoll": "*", "fabric-gametest-api-v1": "*"}
+}

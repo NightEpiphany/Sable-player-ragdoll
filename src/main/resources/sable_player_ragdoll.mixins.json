@@ -1,14 +1,39 @@
 {
-	"required": true,
-	"package": "com.moigferdsrte.ragdoll.mixin",
-	"compatibilityLevel": "JAVA_21",
-	"mixins": [
-		
-	],
-	"injectors": {
-		"defaultRequire": 1
-	},
-	"overwrites": {
-		"requireAnnotations": true
-	}
+  "required": true,
+  "package": "com.moigferdsrte.ragdoll.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "FabricEntityDataMixin",
+    "RagdollCrashReportMixin",
+    "LivingEntityTickMixin",
+    "EntityRagdollMountMixin",
+    "EntityRagdollHiddenMixin",
+    "PlayerRagdollHiddenMixin",
+    "LivingEntityRagdollDamageMixin",
+    "ActiveSableCompanionBodyGuardMixin",
+    "ProjectileRagdollMixin",
+    "ExplosionRagdollMixin",
+    "SubLevelRemovalIterationMixin"
+  ],
+  "client": [
+    "client.GuiOverlayRagdollMixin",
+    "client.LivingEntityRendererAccessor",
+    "client.LivingEntityRendererMixin",
+    "client.LivingEntityRendererRagdollMixin",
+    "client.HumanoidArmorLayerMixin",
+    "client.HumanoidModelMixin",
+    "client.RagdollFirstPersonEyeMixin",
+    "client.ActiveSableCompanionCameraMixin",
+    "client.EntitySubLevelRotationHelperMixin",
+    "client.EntityRenderDispatcherAccessor",
+    "client.RagdollHandRenderMixin",
+    "client.RagdollMouseMixin",
+    "client.RagdollCameraDistanceMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "overwrites": {
+    "requireAnnotations": true
+  }
 }

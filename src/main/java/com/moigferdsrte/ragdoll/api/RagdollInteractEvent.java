@@ -4,15 +4,14 @@ import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.bus.api.Event;
-import net.neoforged.bus.api.ICancellableEvent;
 
-public class RagdollInteractEvent extends Event implements ICancellableEvent {
+public class RagdollInteractEvent {
    private final ServerPlayer player;
    private final UUID rootId;
    private final UUID partId;
    private final BlockPos pos;
    private final ServerLevel level;
+   private boolean canceled;
 
    public RagdollInteractEvent(ServerPlayer player, UUID rootId, UUID partId, BlockPos pos, ServerLevel level) {
       this.player = player;
@@ -41,5 +40,13 @@ public class RagdollInteractEvent extends Event implements ICancellableEvent {
 
    public ServerLevel level() {
       return this.level;
+   }
+
+   public boolean isCanceled() {
+      return canceled;
+   }
+
+   public void setCanceled(boolean canceled) {
+      this.canceled = canceled;
    }
 }

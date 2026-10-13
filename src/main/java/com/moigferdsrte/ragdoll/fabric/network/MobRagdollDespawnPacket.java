@@ -1,0 +1,48 @@
+package com.moigferdsrte.ragdoll.fabric.network;
+
+import com.moigferdsrte.ragdoll.SablePlayerRagdoll;
+import com.moigferdsrte.ragdoll.mob.MobRagdollAssembly;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import com.moigferdsrte.ragdoll.fabric.network.FabricPayloadContext;
+
+public record MobRagdollDespawnPacket(int entityId) implements CustomPacketPayload {
+    public static final Type<MobRagdollDespawnPacket> TYPE = new Type<>(
+            ResourceLocation.fromNamespaceAndPath(SablePlayerRagdoll.MOD_ID, "mob_ragdoll_despawn")
+    );
+    public static final StreamCodec<RegistryFriendlyByteBuf, MobRagdollDespawnPacket> STREAM_CODEC = StreamCodec.of(
+            MobRagdollDespawnPacket::encode,
+            MobRagdollDespawnPacket::decode
+    );
+
+    @Override
+    public Type<? extends CustomPacketPayload> type() {
+        return TYPE;
+    }
+
+    private static void encode(RegistryFriendlyByteBuf buffer, MobRagdollDespawnPacket packet) {
+        buffer.writeVarInt(packet.entityId());
+    }
+
+    private static MobRagdollDespawnPacket decode(RegistryFriendlyByteBuf buffer) {
+        return new MobRagdollDespawnPacket(buffer.readVarInt());
+    }
+
+    public static void handle(MobRagdollDespawnPacket packet, FabricPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)) {
+                return;
+            }
+            Entity target = player.level().getEntity(packet.entityId());
+            if (!(target instanceof LivingEntity livingEntity) || target == player) {
+                return;
+            }
+            MobRagdollAssembly.despawn(player.serverLevel(), livingEntity);
+        });
+    }
+}

@@ -20,6 +20,9 @@
 		],
 		"client": [
 			"com.moigferdsrte.ragdoll.fabric.SablePlayerRagdollFabricClient"
+		],
+		"jade": [
+			"com.moigferdsrte.ragdoll.compat.jade.RagdollJadePlugin"
 		]
 	},
 	"mixins": [
@@ -27,8 +30,9 @@
 	],
 	"depends": {
 		"fabricloader": ">=0.19.5",
-		"minecraft": "~1.21.1",
+		"minecraft": "1.21.1",
 		"java": ">=21",
-		"fabric-api": "*"
+		"fabric-api": "*",
+		"sable": ">=2.0.6"
 	}
 }

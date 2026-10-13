@@ -16,17 +16,14 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-import net.neoforged.fml.ModList;
+import net.fabricmc.loader.api.FabricLoader;
 
 final class RagdollEquipmentHelper {
    private RagdollEquipmentHelper() {
    }
 
    static void applyExtraEquipment(RagdollPartBlockEntity part, Player player) {
-      if (ModList.get().isLoaded("curios")) {
-         RagdollCuriosEquipmentHelper.applyToPart(part, player);
-      }
-      if (ModList.get().isLoaded("accessories")) {
+      if (FabricLoader.getInstance().isModLoaded("accessories")) {
          RagdollAccessoriesEquipmentHelper.applyToPart(part, player);
       }
    }
@@ -58,13 +55,7 @@ final class RagdollEquipmentHelper {
       }
 
       if (resolved == RagdollEquipmentScope.ALL || resolved == RagdollEquipmentScope.OPTIONAL_MODS) {
-         if (ModList.get().isLoaded("curios")) {
-            RagdollCuriosEquipmentHelper.CurioSnapshot curios = RagdollCuriosEquipmentHelper.captureSnapshot(player);
-            curioItems = curios.items();
-            curioCosmeticItems = curios.cosmeticItems();
-            curioRenderOptions = curios.renderOptions();
-         }
-         if (ModList.get().isLoaded("accessories")) {
+         if (FabricLoader.getInstance().isModLoaded("accessories")) {
             RagdollAccessoriesEquipmentHelper.AccessorySnapshot accessories = RagdollAccessoriesEquipmentHelper.captureSnapshot(player);
             accessoriesItems = accessories.items();
             accessoriesCosmeticItems = accessories.cosmeticItems();
@@ -91,7 +82,7 @@ final class RagdollEquipmentHelper {
    }
 
    static void syncAccessoriesAndSend(ServerLevel level, UUID rootId, Player player) {
-      if (!ModList.get().isLoaded("accessories")) return;
+      if (!FabricLoader.getInstance().isModLoaded("accessories")) return;
       RagdollAccessoriesEquipmentHelper.applyFrom(level, rootId, player);
       sendPartUpdates(level, rootId);
    }

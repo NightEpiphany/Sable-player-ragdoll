@@ -12,8 +12,8 @@ import com.moigferdsrte.ragdoll.mob.block.entity.MobRagdollPartBlockEntity;
 import com.moigferdsrte.ragdoll.mob.api.MobRagdollEndEvent;
 import com.moigferdsrte.ragdoll.mob.api.MobRagdollLaunchOptions;
 import com.moigferdsrte.ragdoll.mob.api.MobRagdollStartEvent;
-import com.moigferdsrte.ragdoll.mob.network.MobRagdollLaunchRequestPacket;
-import com.moigferdsrte.ragdoll.mob.network.MobRagdollSourceStatePacket;
+import com.moigferdsrte.ragdoll.fabric.network.MobRagdollLaunchRequestPacket;
+import com.moigferdsrte.ragdoll.fabric.network.MobRagdollSourceStatePacket;
 import com.moigferdsrte.ragdoll.api.RagdollAPI;
 import com.moigferdsrte.ragdoll.api.RagdollLaunchOptions;
 import com.moigferdsrte.ragdoll.api.RagdollLimbOptions;
@@ -59,8 +59,8 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.neoforge.common.NeoForge;
-import net.neoforged.neoforge.network.PacketDistributor;
+import com.moigferdsrte.ragdoll.fabric.RagdollFabricEvents;
+import com.moigferdsrte.ragdoll.fabric.network.FabricNetwork;
 import org.joml.Quaterniond;
 import org.joml.Vector3d;
 
@@ -194,13 +194,13 @@ public final class MobRagdollAssembly {
             return false;
         }
         MobRagdollStartEvent startEvent = new MobRagdollStartEvent(entity, linear);
-        NeoForge.EVENT_BUS.post(startEvent);
+        RagdollFabricEvents.fire(startEvent);
         if (startEvent.isCanceled()) {
             return false;
         }
         MobRagdollLaunchOptions resolved = options == null ? MobRagdollLaunchOptions.defaults() : options;
         PENDING_LAUNCHES.put(uuid, new PendingLaunch(startEvent.velocity(), angular, resolved, level.getGameTime(), level, UUID.randomUUID()));
-        PacketDistributor.sendToPlayersTrackingEntity(entity,
+        FabricNetwork.sendToTracking(entity,
                 new MobRagdollLaunchRequestPacket(entity.getId(), !entity.isAlive()));
         return true;
     }
@@ -226,7 +226,7 @@ public final class MobRagdollAssembly {
         }
         living.setSilent(true);
         living.setInvulnerable(true);
-        living.getPersistentData().putLong(MOBLESS_SOURCE, level.getGameTime() + PENDING_LAUNCH_TIMEOUT_TICKS);
+        com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(living).putLong(MOBLESS_SOURCE, level.getGameTime() + PENDING_LAUNCH_TIMEOUT_TICKS);
         if (!level.addFreshEntity(living)) {
             return null;
         }
@@ -495,7 +495,7 @@ public final class MobRagdollAssembly {
             MobRagdollSourceRecovery.restore(entity);
             return;
         }
-        entity.getPersistentData().remove(RagdollBlockLifetime.SOURCE_SESSION);
+        com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(entity).remove(RagdollBlockLifetime.SOURCE_SESSION);
         if (entity instanceof Mob mob) {
             mob.setNoAi(false);
         }
@@ -505,13 +505,14 @@ public final class MobRagdollAssembly {
     }
 
     public static void hideLoadedRagdollSource(ServerLevel level, LivingEntity entity, boolean fromDisk) {
-        if (fromDisk && entity.getPersistentData().contains(MOBLESS_SOURCE)) {
+        if (com.moigferdsrte.ragdoll.fabric.FabricEntityData.peek(entity) == null) return;
+        if (fromDisk && com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(entity).contains(MOBLESS_SOURCE)) {
             entity.discard();
             return;
         }
         if (!MobRagdollSourceRecovery.hasRecord(entity)
-                && entity.getPersistentData().hasUUID(RagdollBlockLifetime.SOURCE_SESSION)) {
-            UUID session = entity.getPersistentData().getUUID(RagdollBlockLifetime.SOURCE_SESSION);
+                && com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(entity).hasUUID(RagdollBlockLifetime.SOURCE_SESSION)) {
+            UUID session = com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(entity).getUUID(RagdollBlockLifetime.SOURCE_SESSION);
             var saved = MobRagdollAssemblyData.loaded(level).get(session);
             showRagdollSource(entity);
             long deadline = saved == null ? level.getGameTime() : saved.spawnedAtTick() + saved.durationTicks();
@@ -745,8 +746,10 @@ public final class MobRagdollAssembly {
     }
 
     public static void tickSource(ServerLevel level, LivingEntity source) {
-        if (source.getPersistentData().contains(MOBLESS_SOURCE)
-                && level.getGameTime() >= source.getPersistentData().getLong(MOBLESS_SOURCE)) {
+        var sourceData = com.moigferdsrte.ragdoll.fabric.FabricEntityData.peek(source);
+        if (sourceData == null) return;
+        if (sourceData.contains(MOBLESS_SOURCE)
+                && level.getGameTime() >= sourceData.getLong(MOBLESS_SOURCE)) {
             source.discard();
             return;
         }
@@ -789,7 +792,7 @@ public final class MobRagdollAssembly {
         }
 
         MobRagdollSourceRecovery.clear(source);
-        NeoForge.EVENT_BUS.post(new MobRagdollEndEvent(source, velocity, MobRagdollEndEvent.Reason.ENTITY_DEATH));
+        RagdollFabricEvents.fire(new MobRagdollEndEvent(source, velocity, MobRagdollEndEvent.Reason.ENTITY_DEATH));
     }
 
     private static boolean beginRecovery(ServerLevel level, UUID session, LivingEntity source,
@@ -1039,7 +1042,7 @@ public final class MobRagdollAssembly {
     private static void finishAssembly(ServerLevel level, LivingEntity entity, PendingAssembly pending) {
         invalidateAssemblyState(pending.ragdollId);
         List<SpawnedPart> spawnedParts = pending.assembled;
-        boolean mobless = entity.getPersistentData().contains(MOBLESS_SOURCE);
+        boolean mobless = com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(entity).contains(MOBLESS_SOURCE);
         boolean permanent = mobless && pending.durationTicks == DEFAULT_MOBLESS_DURATION_TICKS;
         Map<String, UUID> partIds = new LinkedHashMap<>();
         Map<String, MobRagdollAssemblyData.PartInfo> partInfos = new LinkedHashMap<>();
@@ -1105,7 +1108,7 @@ public final class MobRagdollAssembly {
             showRagdollSource(source);
             syncClientSourceState(source, false);
             if (discard) source.kill();
-            NeoForge.EVENT_BUS.post(new MobRagdollEndEvent(source, velocity, reason));
+            RagdollFabricEvents.fire(new MobRagdollEndEvent(source, velocity, reason));
         }
         for (var be : RagdollBlockOwnership.loadedBlocks(level)) {
             if (!(be instanceof MobRagdollPartBlockEntity mob) || !session.equals(mob.ragdollIdentity().owner())) continue;
@@ -1116,12 +1119,12 @@ public final class MobRagdollAssembly {
 
     public static void syncClientSourceState(ServerPlayer player, Entity entity) {
         if (entity.level() instanceof ServerLevel level && isActiveOrSavedRagdollSource(level, entity.getUUID())) {
-            PacketDistributor.sendToPlayer(player, new MobRagdollSourceStatePacket(entity.getId(), true));
+            FabricNetwork.send(player, new MobRagdollSourceStatePacket(entity.getId(), true));
         }
     }
 
     private static void syncClientSourceState(Entity entity, boolean hidden) {
-        PacketDistributor.sendToPlayersTrackingEntity(entity, new MobRagdollSourceStatePacket(entity.getId(), hidden));
+        FabricNetwork.sendToTracking(entity, new MobRagdollSourceStatePacket(entity.getId(), hidden));
     }
 
     private static void removeSubLevelIfPresent(SubLevelContainer container, ServerSubLevel subLevel) {
@@ -1502,7 +1505,7 @@ public final class MobRagdollAssembly {
             int xOffset = blockPos.getX() - pos.getX();
             int yOffset = blockPos.getY() - pos.getY();
             int zOffset = blockPos.getZ() - pos.getZ();
-            BlockState partState = MobRagdollBlocks.MOB_RAGDOLL_PART.get().defaultBlockState()
+            BlockState partState = MobRagdollBlocks.MOB_RAGDOLL_PART.defaultBlockState()
                     .setValue(MobRagdollPartBlock.X_SIZE, MobRagdollGeometry.slicePixels(MobRagdollGeometry.collisionPixels(part.xSize()), xOffset))
                     .setValue(MobRagdollPartBlock.Y_SIZE, MobRagdollGeometry.slicePixels(MobRagdollGeometry.collisionPixels(part.ySize()), yOffset))
                     .setValue(MobRagdollPartBlock.Z_SIZE, MobRagdollGeometry.slicePixels(MobRagdollGeometry.collisionPixels(part.zSize()), zOffset));

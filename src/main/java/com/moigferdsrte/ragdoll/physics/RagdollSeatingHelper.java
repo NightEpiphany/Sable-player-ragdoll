@@ -26,7 +26,7 @@ public final class RagdollSeatingHelper {
                targetName(entity), RagdollRegistry.shortId(ragdollSubLevel.getUniqueId()), plotSeatPos.toShortString()
             );
          } else {
-            entity.getVehicle().getPersistentData().putUUID(RagdollBlockLifetime.SOURCE_SESSION,
+            com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(entity.getVehicle()).putUUID(RagdollBlockLifetime.SOURCE_SESSION,
                   RagdollBlockOwnership.sessionId(ragdollSubLevel));
             if (entity instanceof ServerPlayer player) {
                seat.hideRider(player);

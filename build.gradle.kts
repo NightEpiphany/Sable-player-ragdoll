@@ -49,11 +49,47 @@ dependencies {
 	modApi("dev.ryanhcode.sable:sable-fabric-${providers.gradleProperty("minecraft_version").get()}:${providers.gradleProperty("sable_version").get()}") {
 		exclude(group = "fuzs.forgeconfigapiport:forgeconfigapiport")
 	}
-	// Fabric API. This is technically optional, but you probably want it anyway.
+	// Fabric callbacks, registries and play networking are required by this port.
 	modImplementation("net.fabricmc.fabric-api:fabric-api:${providers.gradleProperty("fabric_api_version").get()}")
     modCompileOnly("io.wispforest:accessories-fabric:${providers.gradleProperty("accessories_version").get()}")
     modCompileOnly("maven.modrinth:jade:${providers.gradleProperty("jade_version").get()}")
-	modImplementation("fuzs.forgeconfigapiport:forgeconfigapiport-fabric:21.1.6")
+    testImplementation(platform("org.junit:junit-bom:5.11.4"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+tasks.test { useJUnitPlatform() }
+
+loom {
+    mods {
+        register("sable_player_ragdoll") { sourceSet(sourceSets.main.get()) }
+    }
+}
+
+fabricApi {
+    configureTests {
+        createSourceSet = true
+        modId = "sable_player_ragdoll_test"
+        enableClientGameTests = false
+    }
+}
+
+loom {
+    runs {
+        create("smokeClient") {
+            client()
+            source(sourceSets["gametest"])
+            runDir("build/run/smokeClient")
+            vmArg("-Dragdoll.smoke=true")
+            programArgs("--width", "960", "--height", "540")
+        }
+    }
+}
+
+tasks.named("runSmokeClient") {
+    val marker = layout.buildDirectory.file("run/smokeClient/smoke-success.txt")
+    doFirst { marker.get().asFile.delete() }
+    doLast { check(marker.get().asFile.isFile) { "Client smoke test failed; inspect build/run/smokeClient/logs/latest.log" } }
 }
 
 tasks.processResources {
@@ -67,6 +103,18 @@ tasks.processResources {
 
 tasks.withType<JavaCompile>().configureEach {
 	options.release = 21
+}
+
+// The NeoForge sources are kept in the repository as the reference
+// implementation, but are not part of the Fabric source set.
+sourceSets {
+	main {
+		java {
+			exclude("com/moigferdsrte/ragdoll/neoforge/**")
+			exclude("com/moigferdsrte/ragdoll/mob/network/**")
+			exclude("com/moigferdsrte/ragdoll/physics/RagdollCuriosEquipmentHelper.java")
+		}
+	}
 }
 
 java {

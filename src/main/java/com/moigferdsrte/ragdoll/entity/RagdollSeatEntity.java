@@ -18,10 +18,9 @@ import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.neoforge.common.util.FakePlayer;
-import net.neoforged.neoforge.entity.IEntityWithComplexSpawn;
+import net.fabricmc.fabric.api.entity.FakePlayer;
 
-public final class RagdollSeatEntity extends Entity implements IEntityWithComplexSpawn {
+public final class RagdollSeatEntity extends Entity {
    private static final String ANCHOR_X_KEY = "AnchorX";
    private static final String ANCHOR_Y_KEY = "AnchorY";
    private static final String ANCHOR_Z_KEY = "AnchorZ";
@@ -108,8 +107,8 @@ public final class RagdollSeatEntity extends Entity implements IEntityWithComple
          });
 
          if (this.tickCount > 40 && this.level() instanceof net.minecraft.server.level.ServerLevel serverLevel
-               && getPersistentData().hasUUID(RagdollBlockLifetime.SOURCE_SESSION)) {
-            var owner = getPersistentData().getUUID(RagdollBlockLifetime.SOURCE_SESSION);
+               && com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(this).hasUUID(RagdollBlockLifetime.SOURCE_SESSION)) {
+            var owner = com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(this).getUUID(RagdollBlockLifetime.SOURCE_SESSION);
             var root = ragdollRoot(serverLevel, owner);
             if (root == null) {
                for (var passenger : java.util.List.copyOf(getPassengers())) {
@@ -171,9 +170,4 @@ public final class RagdollSeatEntity extends Entity implements IEntityWithComple
       });
    }
 
-   public void writeSpawnData(RegistryFriendlyByteBuf buffer) {
-   }
-
-   public void readSpawnData(RegistryFriendlyByteBuf additionalData) {
-   }
 }

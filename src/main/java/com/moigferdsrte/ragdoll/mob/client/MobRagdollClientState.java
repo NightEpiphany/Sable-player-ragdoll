@@ -14,7 +14,7 @@ public final class MobRagdollClientState {
     }
 
     public static void setHidden(Entity entity, boolean hidden) {
-        entity.getPersistentData().remove(DEATH_PENDING_UNTIL);
+        com.moigferdsrte.ragdoll.fabric.FabricEntityData.remove(entity, DEATH_PENDING_UNTIL);
         if (hidden) {
             HIDDEN_SOURCES.add(entity);
         } else {
@@ -27,13 +27,13 @@ public final class MobRagdollClientState {
     }
 
     public static void setDeathPending(Entity entity) {
-        entity.getPersistentData().putLong(
+        com.moigferdsrte.ragdoll.fabric.FabricEntityData.putLong(entity,
                 DEATH_PENDING_UNTIL,
                 entity.level().getGameTime() + DEATH_PENDING_TICKS);
     }
 
     public static boolean isDeathPending(Entity entity) {
-        var data = entity.getPersistentData();
+        var data = com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(entity);
         if (!data.contains(DEATH_PENDING_UNTIL)) return false;
         if (entity.level().getGameTime() < data.getLong(DEATH_PENDING_UNTIL)) return true;
         data.remove(DEATH_PENDING_UNTIL);

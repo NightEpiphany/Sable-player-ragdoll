@@ -4,7 +4,7 @@ import com.moigferdsrte.ragdoll.mob.block.MobPartRole;
 import com.moigferdsrte.ragdoll.mob.model.ExtractedMobModel;
 import com.moigferdsrte.ragdoll.mob.model.ExtractedMobModel.PartRole;
 import com.moigferdsrte.ragdoll.mob.model.RenderedModelExtractor;
-import com.moigferdsrte.ragdoll.mob.network.MobRagdollSpawnPacket;
+import com.moigferdsrte.ragdoll.fabric.network.MobRagdollSpawnPacket;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -19,7 +19,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
-import net.neoforged.neoforge.network.PacketDistributor;
+import com.moigferdsrte.ragdoll.fabric.network.FabricClientNetwork;
 
 public final class MobRagdollClientExtractor {
     private MobRagdollClientExtractor() {
@@ -93,7 +93,7 @@ public final class MobRagdollClientExtractor {
                         baby))
                 .toList();
         if (!parts.isEmpty()) {
-            PacketDistributor.sendToServer(new MobRagdollSpawnPacket(
+            FabricClientNetwork.sendToServer(new MobRagdollSpawnPacket(
                     livingEntity.getId(),
                     livingEntity.getType().builtInRegistryHolder().key().location().toString(),
                     bodyYaw,

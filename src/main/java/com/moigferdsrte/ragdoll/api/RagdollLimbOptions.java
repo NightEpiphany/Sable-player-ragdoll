@@ -3,7 +3,7 @@ package com.moigferdsrte.ragdoll.api;
 import com.moigferdsrte.ragdoll.block.entity.RagdollPartBlockEntity.BodyPart;
 import java.util.EnumMap;
 import java.util.Map;
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 
 public final class RagdollLimbOptions {

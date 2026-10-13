@@ -21,21 +21,23 @@ public final class MobRagdollSourceRecovery {
         tag.putBoolean("Invisible", entity.isInvisible());
         tag.putBoolean("NoPhysics", entity.noPhysics);
         if (entity instanceof Mob mob) tag.putBoolean("NoAI", mob.isNoAi());
-        entity.getPersistentData().put(KEY, tag);
-        entity.getPersistentData().putUUID(RagdollBlockLifetime.SOURCE_SESSION, session);
+        com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(entity).put(KEY, tag);
+        com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(entity).putUUID(RagdollBlockLifetime.SOURCE_SESSION, session);
     }
 
     public static boolean hasRecord(LivingEntity entity) {
-        return entity.getPersistentData().getCompound(KEY).hasUUID("Session");
+        var data = com.moigferdsrte.ragdoll.fabric.FabricEntityData.peek(entity);
+        return data != null && data.contains(KEY, 10) && data.getCompound(KEY).hasUUID("Session");
     }
 
     public static UUID session(LivingEntity entity) {
-        var tag = entity.getPersistentData().getCompound(KEY);
+        var tag = com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(entity).getCompound(KEY);
         return tag.hasUUID("Session") ? tag.getUUID("Session") : null;
     }
 
     public static boolean active(LivingEntity entity) {
-        return active(entity.getPersistentData(), entity.level().getGameTime());
+        var data = com.moigferdsrte.ragdoll.fabric.FabricEntityData.peek(entity);
+        return data != null && data.contains(KEY, 10) && active(data, entity.level().getGameTime());
     }
 
     static boolean active(CompoundTag data, long now) {
@@ -46,20 +48,20 @@ public final class MobRagdollSourceRecovery {
     }
 
     public static boolean matches(LivingEntity entity, UUID session) {
-        var data = entity.getPersistentData();
+        var data = com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(entity);
         return session != null && data.hasUUID(RagdollBlockLifetime.SOURCE_SESSION)
                 && session.equals(data.getUUID(RagdollBlockLifetime.SOURCE_SESSION));
     }
 
     public static void extend(LivingEntity entity, long expiresAt) {
-        CompoundTag tag = entity.getPersistentData().getCompound(KEY);
+        CompoundTag tag = com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(entity).getCompound(KEY);
         if (!tag.hasUUID("Session")) return;
         tag.putLong("ExpiresAt", expiresAt);
-        entity.getPersistentData().put(KEY, tag);
+        com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(entity).put(KEY, tag);
     }
 
     public static void restore(LivingEntity entity) {
-        var data = entity.getPersistentData();
+        var data = com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(entity);
         CompoundTag tag = data.getCompound(KEY);
         if (!tag.hasUUID("Session")) return;
         if (matches(entity, tag.getUUID("Session"))) {
@@ -73,7 +75,7 @@ public final class MobRagdollSourceRecovery {
     }
 
     public static void clear(LivingEntity entity) {
-        entity.getPersistentData().remove(RagdollBlockLifetime.SOURCE_SESSION);
-        entity.getPersistentData().remove(KEY);
+        com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(entity).remove(RagdollBlockLifetime.SOURCE_SESSION);
+        com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(entity).remove(KEY);
     }
 }

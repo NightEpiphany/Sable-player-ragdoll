@@ -7,7 +7,7 @@ import com.moigferdsrte.ragdoll.RagdollCollisionRules;
 import com.moigferdsrte.ragdoll.mob.MobRagdollAssembly;
 import dev.ryanhcode.sable.api.block.BlockSubLevelCollisionShape;
 import com.moigferdsrte.ragdoll.mob.block.entity.MobRagdollPartBlockEntity;
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
@@ -136,17 +136,14 @@ public final class MobRagdollPartBlock extends Block implements EntityBlock, Blo
         super.createBlockStateDefinition(builder.add(X_SIZE, Y_SIZE, Z_SIZE));
     }
 
-    @Override
     public boolean canEntityDestroy(BlockState state, BlockGetter level, BlockPos pos, Entity entity) {
         return false;
     }
 
-    @Override
     public boolean onDestroyedByPlayer(BlockState state, Level level, BlockPos pos, Player player, boolean willHarvest, FluidState fluid) {
         return false;
     }
 
-    @Override
     public boolean canDropFromExplosion(BlockState state, BlockGetter level, BlockPos pos, Explosion explosion) {
         return false;
     }

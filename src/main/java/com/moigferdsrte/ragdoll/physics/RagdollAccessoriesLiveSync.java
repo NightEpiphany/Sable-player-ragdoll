@@ -4,7 +4,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
-import net.neoforged.fml.ModList;
+import net.fabricmc.loader.api.FabricLoader;
 
 final class RagdollAccessoriesLiveSync {
     private static final ConcurrentHashMap<UUID, Long> LAST_SIGNATURE = new ConcurrentHashMap<>();
@@ -12,7 +12,7 @@ final class RagdollAccessoriesLiveSync {
     private RagdollAccessoriesLiveSync() {}
 
     static void poll(ServerLevel level, UUID rootId, Player player) {
-        if (!ModList.get().isLoaded("accessories")) return;
+        if (!FabricLoader.getInstance().isModLoaded("accessories")) return;
         long signature = RagdollAccessoriesEquipmentHelper.accessoriesSignature(player);
         Long previous = LAST_SIGNATURE.put(rootId, signature);
         if (previous != null && previous == signature) return;

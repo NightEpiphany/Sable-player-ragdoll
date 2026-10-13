@@ -6,16 +6,18 @@ import net.minecraft.client.gui.Gui;
 import net.minecraft.network.chat.Component;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 
 @Mixin(Gui.class)
 public abstract class GuiOverlayRagdollMixin {
-    @Inject(method = "setOverlayMessage", at = @At("HEAD"), cancellable = true)
-    private void spr$suppressDismountHint(Component message, boolean animateColor, CallbackInfo ci) {
+    @WrapMethod(method = "setOverlayMessage")
+    private void spr$suppressDismountHint(Component message, boolean animateColor, Operation<Void> original) {
         var player = Minecraft.getInstance().player;
         if (player != null && player.getVehicle() instanceof RagdollSeatEntity) {
-            ci.cancel();
+            return;
         }
+
+        original.call(message, animateColor);
     }
 }

@@ -2,9 +2,8 @@ package com.moigferdsrte.ragdoll.mob.api;
 
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.bus.api.Event;
 
-public class MobRagdollEndEvent extends Event {
+public class MobRagdollEndEvent {
     private final LivingEntity entity;
     private final Vec3 exitVelocity;
     private final Reason reason;

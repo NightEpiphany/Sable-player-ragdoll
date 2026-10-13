@@ -18,9 +18,8 @@ import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-import net.neoforged.neoforge.entity.IEntityWithComplexSpawn;
 
-public final class RagdollDollEntity extends LivingEntity implements IEntityWithComplexSpawn {
+public final class RagdollDollEntity extends LivingEntity {
    private static final EntityDataAccessor<Optional<UUID>> DATA_SKIN_UUID = SynchedEntityData.defineId(
       RagdollDollEntity.class, EntityDataSerializers.OPTIONAL_UUID
    );
@@ -133,14 +132,6 @@ public final class RagdollDollEntity extends LivingEntity implements IEntityWith
    @Override
    public HumanoidArm getMainArm() {
       return HumanoidArm.RIGHT;
-   }
-
-   @Override
-   public void writeSpawnData(RegistryFriendlyByteBuf buffer) {
-   }
-
-   @Override
-   public void readSpawnData(RegistryFriendlyByteBuf additionalData) {
    }
 
    public enum BodyPart {

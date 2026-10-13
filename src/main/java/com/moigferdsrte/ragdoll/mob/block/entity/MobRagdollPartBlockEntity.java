@@ -96,7 +96,7 @@ public final class MobRagdollPartBlockEntity extends BlockEntity implements Bloc
     private final Map<UUID, GrabConstraint> grabbers = new HashMap<>();
 
     public MobRagdollPartBlockEntity(BlockPos pos, BlockState blockState) {
-        super(MobRagdollBlocks.MOB_RAGDOLL_PART_ENTITY.get(), pos, blockState);
+        super(MobRagdollBlocks.MOB_RAGDOLL_PART_ENTITY, pos, blockState);
     }
 
     public void configure(ResourceLocation texture, List<Quad> quads, ResourceLocation entityType, UUID sourceEntityId, int sourceEntityNetworkId, String partName, List<String> keepPartNames, CompoundTag variantData, boolean baby, float renderScale, float renderQx, float renderQy, float renderQz, float renderQw, MobPartRole role, float visualXSize, float visualYSize, float visualZSize) {

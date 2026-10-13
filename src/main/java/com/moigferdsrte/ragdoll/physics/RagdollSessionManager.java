@@ -130,7 +130,7 @@ public final class RagdollSessionManager {
    public static @Nullable ServerSubLevel activeRagdollForPlayer(ServerLevel level, UUID playerId) {
       var entity = level.getEntity(playerId);
       if (entity == null || entity.getVehicle() == null) return null;
-      var tag = entity.getVehicle().getPersistentData();
+      var tag = com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(entity.getVehicle());
       if (!tag.hasUUID(RagdollBlockLifetime.SOURCE_SESSION)) return null;
       UUID owner = tag.getUUID(RagdollBlockLifetime.SOURCE_SESSION);
       var root = sourceRoot(entity.getVehicle(), level, owner);

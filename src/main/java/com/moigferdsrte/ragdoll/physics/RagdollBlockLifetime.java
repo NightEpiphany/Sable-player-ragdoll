@@ -148,7 +148,7 @@ public final class RagdollBlockLifetime {
         if (identity.source() == null || identity.owner() == null) return false;
         var source = level.getEntity(identity.source());
         if (!(source instanceof LivingEntity living) || !living.isAlive() || !source.isPassenger()) return false;
-        var tag = source.getVehicle().getPersistentData();
+        var tag = com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(source.getVehicle());
         if (!tag.hasUUID(SOURCE_SESSION)) {
             var containing = Sable.HELPER.getContaining(level, source.getVehicle().blockPosition());
             if (containing instanceof ServerSubLevel part) {
@@ -169,7 +169,7 @@ public final class RagdollBlockLifetime {
         var source = level.getEntity(identity.source());
         // A temporarily unloaded source is permitted only until the block's fixed deadline.
         if (source == null) return true;
-        var tag = source.getPersistentData();
+        var tag = com.moigferdsrte.ragdoll.fabric.FabricEntityData.get(source);
         return source.isAlive() && tag.hasUUID(SOURCE_SESSION) && identity.owner().equals(tag.getUUID(SOURCE_SESSION));
     }
 
