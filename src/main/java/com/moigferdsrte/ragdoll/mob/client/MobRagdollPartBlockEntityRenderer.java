@@ -28,6 +28,13 @@ public final class MobRagdollPartBlockEntityRenderer
     }
 
     @Override
+    public boolean shouldRender(MobRagdollPartBlockEntity blockEntity, Vec3 cameraPosition) {
+        // Sable passes a transformed local camera position during sub-level
+        // extraction, but this block entity still has global plot coordinates.
+        return !blockEntity.isRemoved();
+    }
+
+    @Override
     public void extractRenderState(
             MobRagdollPartBlockEntity blockEntity,
             MobRagdollPartRenderState state,

@@ -12,7 +12,10 @@
     "LivingEntityRagdollDamageMixin",
     "ActiveSableCompanionBodyGuardMixin",
     "ProjectileRagdollMixin",
-    "ExplosionRagdollMixin"
+    "ExplosionRagdollMixin",
+    "ServerLevelSubLevelSaveMixin",
+    "SableHoldingChunkMapMixin",
+    "SableSubLevelSerializerMixin"
   ],
   "client": [
     "client.GuiOverlayRagdollMixin",
@@ -27,6 +30,7 @@
     "client.EntityRenderDispatcherAccessor",
     "client.RagdollHandRenderMixin",
     "client.RagdollMouseMixin",
+    "client.SodiumWorldRendererMixin",
     "client.RagdollCameraDistanceMixin"
   ],
   "injectors": {

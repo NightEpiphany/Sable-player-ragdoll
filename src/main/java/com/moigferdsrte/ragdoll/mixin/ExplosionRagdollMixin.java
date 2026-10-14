@@ -1,4 +1,5 @@
 package com.moigferdsrte.ragdoll.mixin;
+
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.moigferdsrte.ragdoll.mob.MobRagdollAssembly;

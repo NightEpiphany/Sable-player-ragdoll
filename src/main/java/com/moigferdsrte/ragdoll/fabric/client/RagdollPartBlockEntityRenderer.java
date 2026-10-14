@@ -45,16 +45,16 @@ public final class RagdollPartBlockEntityRenderer
       RenderLayerParent<AvatarRenderState, PlayerModel> {
    private static PlayerModel activeModel;
    private static BodyPart activeBodyPart;
-   private final PlayerModel defaultModel;
-   private final PlayerModel slimModel;
+   private final SplitPlayerModel defaultModel;
+   private final SplitPlayerModel slimModel;
    private final net.minecraft.client.renderer.item.ItemModelResolver itemModelResolver;
    private PlayerModel model;
 
    public RagdollPartBlockEntityRenderer(BlockEntityRendererProvider.Context context) {
       ModelPart defaultRoot = context.bakeLayer(ModelLayers.PLAYER);
       ModelPart slimRoot = context.bakeLayer(ModelLayers.PLAYER_SLIM);
-      this.defaultModel = new PlayerModel(defaultRoot, false);
-      this.slimModel = new PlayerModel(slimRoot, true);
+      this.defaultModel = new SplitPlayerModel(defaultRoot, false);
+      this.slimModel = new SplitPlayerModel(slimRoot, true);
       this.itemModelResolver = context.itemModelResolver();
       this.model = this.defaultModel;
    }
@@ -70,6 +70,14 @@ public final class RagdollPartBlockEntityRenderer
    @Override
    public RenderState createRenderState() {
       return new RenderState();
+   }
+
+   @Override
+   public boolean shouldRender(RagdollPartBlockEntity blockEntity, Vec3 cameraPosition) {
+      // Sable extracts sub-level block entities with a transformed (local)
+      // camera position, while the block entity keeps its global plot
+      // coordinates. The vanilla distance check therefore culls every part.
+      return !blockEntity.isRemoved();
    }
 
    @Override
@@ -91,6 +99,7 @@ public final class RagdollPartBlockEntityRenderer
       state.feet = blockEntity.itemBySlot(EquipmentSlot.FEET).copy();
       state.mainHand = blockEntity.itemBySlot(EquipmentSlot.MAINHAND).copy();
       state.offHand = blockEntity.itemBySlot(EquipmentSlot.OFFHAND).copy();
+      state.avatar.bodyPart = state.bodyPart;
       state.avatar.skin = state.skin;
       state.avatar.lightCoords = state.lightCoords;
       state.avatar.showCape = state.skin.cape() != null;
@@ -118,6 +127,10 @@ public final class RagdollPartBlockEntityRenderer
       if (state.source != null) {
          LivingEntityRenderer renderer = (LivingEntityRenderer) rendererFor(state.source);
          renderer.extractRenderState(state.source, state.avatar, partialTick);
+         // The source player is intentionally invisible while seated; render the ragdoll as a visible avatar.
+         state.avatar.isInvisible = false;
+         state.avatar.isInvisibleToPlayer = false;
+         state.avatar.bodyPart = state.bodyPart;
          state.avatar.skin = state.skin;
          state.avatar.headEquipment = state.head;
          state.avatar.chestEquipment = state.chest;
@@ -150,6 +163,7 @@ public final class RagdollPartBlockEntityRenderer
          return;
       }
 
+      state.avatar.bodyPart = state.bodyPart;
       this.model = state.skin.model() == PlayerModelType.SLIM ? this.slimModel : this.defaultModel;
       try (EmfVanillaModelCompat.Session ignored = EmfVanillaModelCompat.enter(this.model)) {
          activeModel = this.model;
@@ -157,7 +171,6 @@ public final class RagdollPartBlockEntityRenderer
          poseStack.pushPose();
          try {
             this.model.setupAnim(state.avatar);
-            showOnly(this.model, state.bodyPart);
             ModelPart selectedPart = visiblePart(this.model, state.bodyPart);
             positionPart(state.bodyPart, selectedPart, poseStack);
             int overlay = state.hurt ? OverlayTexture.pack(0, 3) : OverlayTexture.NO_OVERLAY;
@@ -214,21 +227,6 @@ public final class RagdollPartBlockEntityRenderer
       return (LivingEntityRenderer) Minecraft.getInstance().getEntityRenderDispatcher().getRenderer(entity);
    }
 
-   private static void showOnly(PlayerModel model, BodyPart part) {
-      model.head.visible = part == BodyPart.HEAD;
-      model.body.visible = part == BodyPart.TORSO;
-      model.leftArm.visible = part == BodyPart.LEFT_ARM;
-      model.rightArm.visible = part == BodyPart.RIGHT_ARM;
-      model.leftLeg.visible = part == BodyPart.LEFT_LEG;
-      model.rightLeg.visible = part == BodyPart.RIGHT_LEG;
-      model.hat.visible = part == BodyPart.HEAD;
-      model.jacket.visible = part == BodyPart.TORSO;
-      model.leftSleeve.visible = part == BodyPart.LEFT_ARM;
-      model.rightSleeve.visible = part == BodyPart.RIGHT_ARM;
-      model.leftPants.visible = part == BodyPart.LEFT_LEG;
-      model.rightPants.visible = part == BodyPart.RIGHT_LEG;
-   }
-
    private static ModelPart visiblePart(PlayerModel model, BodyPart part) {
       return switch (part) {
          case HEAD -> model.head;
@@ -263,7 +261,7 @@ public final class RagdollPartBlockEntityRenderer
       public BodyPart bodyPart = BodyPart.TORSO;
       public GameProfile profile = new GameProfile(new UUID(0L, 0L), "Player");
       public PlayerSkin skin = DefaultPlayerSkin.getDefaultSkin();
-      public AvatarRenderState avatar = new AvatarRenderState();
+      public AvatarState avatar = new AvatarState();
       public boolean corpse;
       public boolean hurt;
       public ItemStack head = ItemStack.EMPTY;
@@ -274,5 +272,35 @@ public final class RagdollPartBlockEntityRenderer
       public ItemStack offHand = ItemStack.EMPTY;
       public @Nullable LivingEntity source;
       public @Nullable RagdollDollEntity doll;
+   }
+
+   public static final class AvatarState extends AvatarRenderState {
+      private BodyPart bodyPart = BodyPart.TORSO;
+   }
+
+   private static final class SplitPlayerModel extends PlayerModel {
+      private SplitPlayerModel(ModelPart root, boolean slim) {
+         super(root, slim);
+      }
+
+      @Override
+      public void setupAnim(AvatarRenderState state) {
+         super.setupAnim(state);
+         if (state instanceof AvatarState ragdollState) {
+            BodyPart part = ragdollState.bodyPart;
+            this.head.visible = part == BodyPart.HEAD;
+            this.body.visible = part == BodyPart.TORSO;
+            this.leftArm.visible = part == BodyPart.LEFT_ARM;
+            this.rightArm.visible = part == BodyPart.RIGHT_ARM;
+            this.leftLeg.visible = part == BodyPart.LEFT_LEG;
+            this.rightLeg.visible = part == BodyPart.RIGHT_LEG;
+            this.hat.visible = part == BodyPart.HEAD && state.showHat;
+            this.jacket.visible = part == BodyPart.TORSO && state.showJacket;
+            this.leftSleeve.visible = part == BodyPart.LEFT_ARM && state.showLeftSleeve;
+            this.rightSleeve.visible = part == BodyPart.RIGHT_ARM && state.showRightSleeve;
+            this.leftPants.visible = part == BodyPart.LEFT_LEG && state.showLeftPants;
+            this.rightPants.visible = part == BodyPart.RIGHT_LEG && state.showRightPants;
+         }
+      }
    }
 }

@@ -56,9 +56,6 @@ tasks.withType<JavaCompile>().configureEach {
 sourceSets {
 	main {
 		java {
-			exclude("com/moigferdsrte/ragdoll/neoforge/**")
-			exclude("com/moigferdsrte/ragdoll/mob/network/**")
-			exclude("com/moigferdsrte/ragdoll/physics/RagdollCuriosEquipmentHelper.java")
 		}
 	}
 }

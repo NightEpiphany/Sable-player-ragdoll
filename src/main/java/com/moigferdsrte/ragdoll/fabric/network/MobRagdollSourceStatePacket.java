@@ -8,7 +8,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.Entity;
-import com.moigferdsrte.ragdoll.fabric.network.FabricPayloadContext;
+import org.jspecify.annotations.NonNull;
 
 public record MobRagdollSourceStatePacket(int entityId, boolean hidden) implements CustomPacketPayload {
     public static final Type<MobRagdollSourceStatePacket> TYPE = new Type<>(
@@ -20,7 +20,7 @@ public record MobRagdollSourceStatePacket(int entityId, boolean hidden) implemen
     );
 
     @Override
-    public Type<? extends CustomPacketPayload> type() {
+    public @NonNull Type<? extends CustomPacketPayload> type() {
         return TYPE;
     }
 
